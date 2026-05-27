@@ -13,6 +13,7 @@ interface Props {
   isAdmin: boolean;
   onDelete: (staff: StaffRecord) => void;
   startIndex?: number;
+  theadTop?: number;
 }
 
 interface ContextMenu {
@@ -21,7 +22,7 @@ interface ContextMenu {
   record: StaffRecord;
 }
 
-export function StaffTable({ staff, loading, isAdmin, onDelete, startIndex = 1 }: Props) {
+export function StaffTable({ staff, loading, isAdmin, onDelete, startIndex = 1, theadTop = 0 }: Props) {
   const navigate = useNavigate();
   const [ctx, setCtx] = useState<ContextMenu | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -54,7 +55,7 @@ export function StaffTable({ staff, loading, isAdmin, onDelete, startIndex = 1 }
   return (
     <>
       <Table>
-        <Thead>
+        <Thead top={theadTop}>
           <tr>
             <Th>Sl</Th>
             <Th>Name</Th>

@@ -7,7 +7,7 @@ interface TableProps {
 
 export function Table({ children, className = '' }: TableProps) {
   return (
-    <div className={`overflow-auto rounded-lg border border-[#E2E5EA] ${className}`}>
+    <div className={`overflow-x-auto rounded-lg border border-[#E2E5EA] ${className}`}>
       <table className="w-full text-sm border-collapse table-striped">
         {children}
       </table>
@@ -15,9 +15,9 @@ export function Table({ children, className = '' }: TableProps) {
   );
 }
 
-export function Thead({ children }: { children: React.ReactNode }) {
+export function Thead({ children, top = 0 }: { children: React.ReactNode; top?: number }) {
   return (
-    <thead className="bg-[#F7F8FA] sticky top-0 z-10">
+    <thead className="bg-[#F7F8FA] sticky z-10" style={{ top }}>
       {children}
     </thead>
   );
