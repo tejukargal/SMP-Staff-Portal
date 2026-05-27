@@ -1,0 +1,90 @@
+import type { Timestamp } from 'firebase/firestore';
+
+export type DesignationEnum =
+  | 'PRINCIPAL'
+  | 'SUPDT.'
+  | 'FDC'
+  | 'SDC'
+  | 'TYPIST'
+  | 'GROUP D'
+  | 'SEL GR LECT'
+  | 'LECTURER'
+  | 'INSTRUCTOR'
+  | 'ASST. INST'
+  | 'MECHANIC'
+  | 'HELPER'
+  | 'SYS. ANALIST'
+  | 'OPERATOR'
+  | 'HOD'
+  | 'OTHER';
+
+export type DeptEnum = 'OFFICE' | 'ME' | 'CE' | 'EC' | 'CS' | 'EE' | 'SCIENCE';
+
+export type StatusEnum = 'IN SERVICE' | 'RTRD' | 'DECEASED' | 'RESIGNED' | 'TRANSFERRED';
+
+export type StaffType = 'TEACHING' | 'NON-TEACHING';
+
+export type UserRole = 'admin' | 'viewer';
+
+export interface StaffRecord {
+  id?: string;
+  sl: number;
+  name: string;
+  empId: string;
+  designation: DesignationEnum;
+  type: StaffType;
+  dept: DeptEnum;
+  status: StatusEnum;
+  dob: string;
+  phone: string;
+  email: string;
+  doe: string;
+  dor?: string;
+  bankAccountNo: string;
+  pan: string;
+  aadhar: string;
+  payScale?: string;
+  basicPay?: number;
+  da?: number;
+  hra?: number;
+  nps?: number;
+  pt?: number;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  createdBy: string;
+  photoUrl?: string;
+  remarks?: string;
+  caste?: string;
+  category?: string;
+  dateOfCompletion?: string;
+  classObtained?: string;
+  university?: string;
+  approvalOrderNumber?: string;
+  dateOfApproval?: string;
+  arrearsTakenFrom?: string;
+}
+
+export interface UserRecord {
+  uid: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  disabled?: boolean;
+}
+
+export interface SalaryRow {
+  staffId: string;
+  name: string;
+  designation: DesignationEnum;
+  dept: DeptEnum;
+  basicPay: number;
+  daPercent: number;
+  hraPercent: number;
+  daAmount: number;
+  hraAmount: number;
+  gross: number;
+  nps: number;
+  pt: number;
+  otherDed: number;
+  net: number;
+}
