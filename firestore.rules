@@ -32,6 +32,12 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow read: if isOwn(uid) || isAdmin();
+      allow create: if isOwn(uid);
+      allow update, delete: if isAdmin();
+    }
+
+    match /pendingUsers/{email} {
+      allow read: if isAuthenticated();
       allow create, update, delete: if isAdmin();
     }
   }

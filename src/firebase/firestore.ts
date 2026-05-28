@@ -180,10 +180,20 @@ export async function deleteLicPolicy(staffId: string, policyId: string): Promis
 
 // ── Users ──────────────────────────────────────────────────────────────
 
-export async function getUserById(uid: string): Promise<UserRecord | null> {
+export async function getUserById(uid: string, email?: string): Promise<UserRecord | null> {
   const snap = await getDoc(doc(db, 'users', uid));
-  if (!snap.exists()) return null;
-  return { uid, ...snap.data() } as UserRecord;
+  if (snap.exists()) return { uid, ...snap.data() } as UserRecord;
+
+  // First login: check pendingUsers by email, then self-register under real UID
+  if (!email) return null;
+  const pendingSnap = await getDoc(doc(db, 'pendingUsers', email.toLowerCase()));
+  if (!pendingSnap.exists()) return null;
+
+  const data = pendingSnap.data() as Omit<UserRecord, 'uid'>;
+  await setDoc(doc(db, 'users', uid), data);
+  await deleteDoc(pendingSnap.ref);
+
+  return { uid, ...data };
 }
 
 export async function getAllUsers(): Promise<UserRecord[]> {
@@ -195,8 +205,8 @@ export async function setUser(uid: string, data: Omit<UserRecord, 'uid'>): Promi
   await updateDoc(doc(db, 'users', uid), data as DocumentData);
 }
 
-export async function createUserDoc(uid: string, data: Omit<UserRecord, 'uid'>): Promise<void> {
-  await setDoc(doc(db, 'users', uid), data);
+export async function createUserDoc(_uid: string, data: Omit<UserRecord, 'uid'>): Promise<void> {
+  await setDoc(doc(db, 'pendingUsers', data.email.toLowerCase()), data);
 }
 
 export async function updateUserRole(uid: string, role: 'admin' | 'viewer'): Promise<void> {

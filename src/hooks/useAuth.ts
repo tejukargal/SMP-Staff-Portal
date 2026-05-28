@@ -20,7 +20,7 @@ export function useAuth(): AuthState {
         return;
       }
       try {
-        const record = await getUserById(user.uid);
+        const record = await getUserById(user.uid, user.email ?? undefined);
         setState({ user, role: record?.role ?? null, loading: false });
       } catch {
         setState({ user, role: null, loading: false });

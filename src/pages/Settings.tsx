@@ -8,7 +8,6 @@ import { useToast } from '@/components/ui/Toast';
 import { Table, Thead, Th, Tr, Td } from '@/components/ui/Table';
 import { PageSpinner } from '@/components/ui/Spinner';
 import type { UserRecord } from '@/types';
-import { currentYear } from '@/utils/dateUtils';
 
 const RESET_PASSKEY = 'giri1977';
 
@@ -132,8 +131,9 @@ export default function Settings() {
       setNewRole('viewer');
       setShowAdd(false);
       await fetchUsers();
-    } catch {
-      showToast('error', 'Failed to create user');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      showToast('error', `Failed to create user: ${msg}`);
     } finally {
       setSaving(false);
     }
@@ -259,29 +259,6 @@ export default function Settings() {
       </div>
 
       {showReset && <ResetModal onClose={() => setShowReset(false)} />}
-
-      {/* App Info */}
-      <div className="bg-white rounded-xl border border-[#E2E5EA] p-6">
-        <h2 className="text-base font-semibold text-[#111827] mb-4">App Information</h2>
-        <div className="flex flex-col gap-2 text-sm">
-          <div className="flex justify-between py-2 border-b border-[#F3F4F6]">
-            <span className="text-[#6B7280]">Institution</span>
-            <span className="font-medium">Sanjay Memorial Polytechnic, Sagar</span>
-          </div>
-          <div className="flex justify-between py-2 border-b border-[#F3F4F6]">
-            <span className="text-[#6B7280]">Academic Year</span>
-            <span className="font-medium">{currentYear()}–{currentYear() + 1}</span>
-          </div>
-          <div className="flex justify-between py-2 border-b border-[#F3F4F6]">
-            <span className="text-[#6B7280]">Portal Version</span>
-            <span className="font-medium font-mono">v1.0.0</span>
-          </div>
-          <div className="flex justify-between py-2">
-            <span className="text-[#6B7280]">Database</span>
-            <span className="font-medium">Firebase Firestore (asia-south1)</span>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
