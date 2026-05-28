@@ -397,7 +397,7 @@ export default function LeaveRecords() {
     try {
       const staff = await getAllStaff();
       setStaffList(staff);
-      const arrays = await Promise.all(staff.map(s => getLeaveRecords(s.id)));
+      const arrays = await Promise.all(staff.map(s => s.id ? getLeaveRecords(s.id) : Promise.resolve([])));
       const all = arrays
         .flat()
         .sort((a, b) => (b.fromDate ?? '').localeCompare(a.fromDate ?? ''));
