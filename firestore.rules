@@ -23,6 +23,11 @@ service cloud.firestore {
         allow read: if isAuthenticated();
         allow create, update, delete: if isAdmin();
       }
+
+      match /licPolicies/{policyId} {
+        allow read: if isAuthenticated();
+        allow create, update, delete: if isAdmin();
+      }
     }
 
     match /users/{uid} {

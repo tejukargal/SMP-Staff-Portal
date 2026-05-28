@@ -8,6 +8,7 @@ import StaffProfile from '@/pages/StaffProfile';
 import SalaryBill from '@/pages/SalaryBill';
 import Reports from '@/pages/Reports';
 import LeaveRecords from '@/pages/LeaveRecords';
+import LicPolicies from '@/pages/LicPolicies';
 import Settings from '@/pages/Settings';
 
 export default function App() {
@@ -24,6 +25,7 @@ export default function App() {
           <Route path="/salary" element={<SalaryBill />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/leave-records" element={<LeaveRecords />} />
+          <Route path="/lic-policies" element={<LicPolicies />} />
 
           <Route element={<AdminRoute />}>
             <Route path="/staff/new" element={<StaffForm />} />

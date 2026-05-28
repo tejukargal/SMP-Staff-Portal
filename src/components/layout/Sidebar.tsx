@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, DollarSign, FileText, CalendarDays, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, CalendarDays, ShieldCheck, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useRole } from '@/hooks/useRole';
 
 interface SidebarProps {
@@ -8,11 +8,11 @@ interface SidebarProps {
 }
 
 const NAV = [
-  { to: '/dashboard', label: 'Dashboard',   icon: LayoutDashboard },
-  { to: '/staff',     label: 'Staff',        icon: Users },
-  { to: '/salary',    label: 'Salary Bill',  icon: DollarSign },
+  { to: '/dashboard',     label: 'Dashboard',    icon: LayoutDashboard },
+  { to: '/staff',         label: 'Staff',         icon: Users },
   { to: '/reports',       label: 'Reports',       icon: FileText },
   { to: '/leave-records', label: 'Leave Records', icon: CalendarDays },
+  { to: '/lic-policies',  label: 'LIC Policies',  icon: ShieldCheck },
   { to: '/settings',      label: 'Settings',      icon: Settings, adminOnly: true },
 ];
 

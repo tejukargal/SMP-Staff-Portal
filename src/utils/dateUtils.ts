@@ -1,4 +1,4 @@
-import { format, parseISO, differenceInYears, addYears } from 'date-fns';
+import { format, parseISO, differenceInYears, addYears, endOfMonth, subMonths } from 'date-fns';
 
 export function formatDate(isoString: string | undefined): string {
   if (!isoString) return '—';
@@ -19,7 +19,13 @@ export function computeServiceYears(doe: string): number {
 
 export function computeDOR(dob: string): string {
   try {
-    return format(addYears(parseISO(dob), 60), 'yyyy-MM-dd');
+    const dobDate = parseISO(dob);
+    const retirementBirthday = addYears(dobDate, 60);
+    // KCSR exception: born on the 1st → retire last day of the preceding month
+    const base = dobDate.getDate() === 1
+      ? subMonths(retirementBirthday, 1)
+      : retirementBirthday;
+    return format(endOfMonth(base), 'yyyy-MM-dd');
   } catch {
     return '';
   }

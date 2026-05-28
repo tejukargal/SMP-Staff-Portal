@@ -29,7 +29,7 @@ export const LEAVE_COLORS: Record<LeaveType, { bg: string; border: string; accen
   EL:  { bg: '#FFF7ED', border: '#FED7AA', accent: '#EA580C' },
 };
 
-/** Parse dd/mm/yy or dd-mm-yy → YYYY-MM-DD. Returns null if invalid. */
+/** Parse dd/mm/yyyy or dd-mm-yyyy → YYYY-MM-DD. Returns null if invalid. */
 export function parseDateInput(s: string): string | null {
   if (!s) return null;
   const parts = s.replace(/-/g, '/').split('/');
@@ -42,18 +42,18 @@ export function parseDateInput(s: string): string | null {
   return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
-/** YYYY-MM-DD → dd/mm/yy */
+/** YYYY-MM-DD → dd/mm/yyyy */
 export function fmtDate(iso: string): string {
   if (!iso) return '—';
   const [y, m, d] = iso.split('-');
-  return `${d}/${m}/${y.slice(-2)}`;
+  return `${d}/${m}/${y}`;
 }
 
-/** YYYY-MM-DD → dd/mm/yy for text input pre-fill */
+/** YYYY-MM-DD → dd/mm/yyyy for text input pre-fill */
 export function isoToInput(iso: string): string {
   if (!iso) return '';
   const [y, m, d] = iso.split('-');
-  return `${d}/${m}/${y.slice(-2)}`;
+  return `${d}/${m}/${y}`;
 }
 
 export function computeDays(fromIso: string, toIso: string, dayType: DayType): number {
@@ -65,7 +65,7 @@ export function computeDays(fromIso: string, toIso: string, dayType: DayType): n
 }
 
 export const EMPTY_LEAVE_FORM = {
-  fromDate: '', toDate: '', type: 'CL' as LeaveType, dayType: 'FULL' as DayType, note: '',
+  fromDate: '', toDate: '', type: 'CL' as LeaveType, dayType: 'FULL' as DayType, note: 'Personal',
 };
 
 export function LeaveModal({ open, staff, onClose }: Props) {
@@ -128,8 +128,8 @@ export function LeaveModal({ open, staff, onClose }: Props) {
     const fromIso = parseDateInput(form.fromDate);
     const toIso   = parseDateInput(form.toDate);
     const errs = {
-      from: fromIso ? '' : form.fromDate ? 'Invalid — use dd/mm/yy' : 'Required',
-      to:   toIso   ? '' : form.toDate   ? 'Invalid — use dd/mm/yy' : 'Required',
+      from: fromIso ? '' : form.fromDate ? 'Invalid — use dd/mm/yyyy' : 'Required',
+      to:   toIso   ? '' : form.toDate   ? 'Invalid — use dd/mm/yyyy' : 'Required',
     };
     setDateErrors(errs);
     if (!fromIso || !toIso) return null;
@@ -520,9 +520,9 @@ export function LeaveFormDateField({ label, value, error, onChange }: {
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-[10px] font-medium text-[#6B7280]">{label} <span className="text-[#9CA3AF]">(dd/mm/yy)</span></span>
+      <span className="text-[10px] font-medium text-[#6B7280]">{label} <span className="text-[#9CA3AF]">(dd/mm/yyyy)</span></span>
       <input
-        type="text" inputMode="numeric" placeholder="15/05/25" maxLength={8}
+        type="text" inputMode="numeric" placeholder="15/05/2025" maxLength={10}
         value={value} onChange={(e) => onChange(e.target.value)}
         className={`border rounded-lg px-2.5 py-1.5 text-xs text-[#374151] bg-white font-mono focus:outline-none focus:ring-2 focus:ring-[#2563EB]/30 transition-colors ${error ? 'border-[#F87171]' : 'border-[#E5E7EB] focus:border-[#2563EB]'}`}
       />

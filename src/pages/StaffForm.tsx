@@ -115,7 +115,11 @@ export default function StaffForm() {
     setFetching(true);
     getStaffById(id)
       .then((data) => {
-        if (data) { setForm(data); originalRef.current = data; }
+        if (data) {
+          const recomputed = { ...data, dor: computeDOR(data.dob) || data.dor };
+          setForm(recomputed);
+          originalRef.current = recomputed;
+        }
         else showToast('error', 'Staff record not found');
       })
       .catch(() => showToast('error', 'Failed to load staff record'))

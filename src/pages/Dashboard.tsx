@@ -620,22 +620,22 @@ export default function Dashboard() {
                   <th colSpan={3} className="pb-1 text-center font-bold text-[10px] uppercase tracking-wide pr-4" style={{ color: '#D97706' }}>Non-Teaching</th>
                   <th className="pb-2 text-right font-semibold text-gray-400 uppercase tracking-wide text-[10px] whitespace-nowrap">Total</th>
                 </tr>
-                <tr className="border-b border-sky-50">
-                  <th className="pb-2 pr-4" />
-                  <th className="pb-2 text-center text-[10px] font-medium text-gray-400 pr-2 whitespace-nowrap">InSvc</th>
-                  <th className="pb-2 text-center text-[10px] font-medium text-gray-400 pr-2 whitespace-nowrap">Others</th>
-                  <th className="pb-2 text-center text-[10px] font-semibold pr-4 whitespace-nowrap" style={{ color: '#7C3AED' }}>Sub</th>
-                  <th className="pb-2 text-center text-[10px] font-medium text-gray-400 pr-2 whitespace-nowrap">InSvc</th>
-                  <th className="pb-2 text-center text-[10px] font-medium text-gray-400 pr-2 whitespace-nowrap">Others</th>
-                  <th className="pb-2 text-center text-[10px] font-semibold pr-4 whitespace-nowrap" style={{ color: '#D97706' }}>Sub</th>
-                  <th className="pb-2" />
+                <tr className="border-b border-sky-200">
+                  <th className="py-1.5 pr-4" />
+                  <th className="py-1.5 text-center text-[10px] font-semibold text-gray-500 pr-2 whitespace-nowrap align-middle">InSvc</th>
+                  <th className="py-1.5 text-center text-[10px] font-semibold text-gray-500 pr-2 whitespace-nowrap align-middle">Others</th>
+                  <th className="py-1.5 text-center text-[10px] font-semibold pr-4 whitespace-nowrap align-middle" style={{ color: '#7C3AED' }}>Sub</th>
+                  <th className="py-1.5 text-center text-[10px] font-semibold text-gray-500 pr-2 whitespace-nowrap align-middle">InSvc</th>
+                  <th className="py-1.5 text-center text-[10px] font-semibold text-gray-500 pr-2 whitespace-nowrap align-middle">Others</th>
+                  <th className="py-1.5 text-center text-[10px] font-semibold pr-4 whitespace-nowrap align-middle" style={{ color: '#D97706' }}>Sub</th>
+                  <th className="py-1.5" />
                 </tr>
               </thead>
               <tbody>
                 {categoryStats.map(({ dept, tInSvc, tOthers, tTotal, ntInSvc, ntOthers, ntTotal, total }, i) => (
                   <tr
                     key={dept}
-                    className="border-b border-sky-50 last:border-0 hover:bg-sky-50/50 transition-colors"
+                    className="border-b border-sky-200 last:border-0 hover:bg-sky-50/50 transition-colors"
                     style={{ animation: `content-enter 0.3s ease-out ${540 + i * 40}ms both` }}
                   >
                     <td className="py-1.5 pr-4"><DeptBadge dept={dept} /></td>
@@ -676,15 +676,15 @@ export default function Dashboard() {
                 <th colSpan={3} className="pb-1 text-center font-bold text-[10px] uppercase tracking-wide pr-6" style={{ color: '#D97706' }}>Non-Teaching</th>
                 <th className="pb-2 text-right font-semibold text-sky-600 uppercase tracking-wide text-[10px] whitespace-nowrap">Total</th>
               </tr>
-              <tr className="border-b border-sky-50">
-                <th className="pb-2 pr-6" />
-                <th className="pb-2 text-center text-[10px] font-medium text-gray-400 pr-3 whitespace-nowrap">In Service</th>
-                <th className="pb-2 text-center text-[10px] font-medium text-gray-400 pr-3 whitespace-nowrap">Others</th>
-                <th className="pb-2 text-center text-[10px] font-semibold pr-6 whitespace-nowrap" style={{ color: '#7C3AED' }}>Sub-total</th>
-                <th className="pb-2 text-center text-[10px] font-medium text-gray-400 pr-3 whitespace-nowrap">In Service</th>
-                <th className="pb-2 text-center text-[10px] font-medium text-gray-400 pr-3 whitespace-nowrap">Others</th>
-                <th className="pb-2 text-center text-[10px] font-semibold pr-6 whitespace-nowrap" style={{ color: '#D97706' }}>Sub-total</th>
-                <th className="pb-2" />
+              <tr className="border-b border-sky-200">
+                <th className="py-1.5 pr-6" />
+                <th className="py-1.5 text-center text-[10px] font-semibold text-gray-500 pr-3 whitespace-nowrap align-middle">In Service</th>
+                <th className="py-1.5 text-center text-[10px] font-semibold text-gray-500 pr-3 whitespace-nowrap align-middle">Others</th>
+                <th className="py-1.5 text-center text-[10px] font-semibold pr-6 whitespace-nowrap align-middle" style={{ color: '#7C3AED' }}>Sub-total</th>
+                <th className="py-1.5 text-center text-[10px] font-semibold text-gray-500 pr-3 whitespace-nowrap align-middle">In Service</th>
+                <th className="py-1.5 text-center text-[10px] font-semibold text-gray-500 pr-3 whitespace-nowrap align-middle">Others</th>
+                <th className="py-1.5 text-center text-[10px] font-semibold pr-6 whitespace-nowrap align-middle" style={{ color: '#D97706' }}>Sub-total</th>
+                <th className="py-1.5" />
               </tr>
             </thead>
             <tbody>
@@ -695,7 +695,7 @@ export default function Dashboard() {
               ) : catRows.map(({ cat, tInSvc, tOthers, tTotal, ntInSvc, ntOthers, ntTotal, total }, i) => (
                 <tr
                   key={cat}
-                  className="border-b border-sky-50 last:border-0 hover:bg-sky-50/50 transition-colors"
+                  className="border-b border-sky-200 last:border-0 hover:bg-sky-50/50 transition-colors"
                   style={{ animation: `content-enter 0.3s ease-out ${600 + i * 40}ms both` }}
                 >
                   <td className="py-1.5 pr-6">

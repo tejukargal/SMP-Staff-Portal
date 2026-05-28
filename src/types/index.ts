@@ -89,6 +89,14 @@ export interface StaffRecord {
   leaveBalance?: LeaveBalance;
 }
 
+export interface LicPolicy {
+  id?: string;
+  policyNumber: string;
+  premiumAmount: number;
+  maturityDate: string; // ISO YYYY-MM-DD
+  createdAt?: import('firebase/firestore').Timestamp;
+}
+
 export interface UserRecord {
   uid: string;
   email: string;

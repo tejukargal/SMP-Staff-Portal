@@ -18,7 +18,7 @@ import {
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { app } from './config';
-import type { StaffRecord, UserRecord, LeaveBalance, LeaveRecord } from '@/types';
+import type { StaffRecord, UserRecord, LeaveBalance, LeaveRecord, LicPolicy } from '@/types';
 
 export const db = getFirestore(app);
 
@@ -140,6 +140,42 @@ export async function updateLeaveRecord(
 
 export async function deleteLeaveRecord(staffId: string, recordId: string): Promise<void> {
   await deleteDoc(doc(db, 'staff', staffId, 'leaveRecords', recordId));
+}
+
+// ── LIC Policies ──────────────────────────────────────────────────────
+
+function licFromDoc(snap: QueryDocumentSnapshot<DocumentData>): LicPolicy {
+  return { id: snap.id, ...snap.data() } as LicPolicy;
+}
+
+export async function getLicPolicies(staffId: string): Promise<LicPolicy[]> {
+  const snap = await getDocs(collection(db, 'staff', staffId, 'licPolicies'));
+  return snap.docs
+    .map(licFromDoc)
+    .sort((a, b) => a.policyNumber.localeCompare(b.policyNumber));
+}
+
+export async function addLicPolicy(
+  staffId: string,
+  data: Omit<LicPolicy, 'id' | 'createdAt'>,
+): Promise<string> {
+  const ref = await addDoc(collection(db, 'staff', staffId, 'licPolicies'), {
+    ...data,
+    createdAt: serverTimestamp(),
+  });
+  return ref.id;
+}
+
+export async function updateLicPolicy(
+  staffId: string,
+  policyId: string,
+  data: Omit<LicPolicy, 'id' | 'createdAt'>,
+): Promise<void> {
+  await updateDoc(doc(db, 'staff', staffId, 'licPolicies', policyId), data as DocumentData);
+}
+
+export async function deleteLicPolicy(staffId: string, policyId: string): Promise<void> {
+  await deleteDoc(doc(db, 'staff', staffId, 'licPolicies', policyId));
 }
 
 // ── Users ──────────────────────────────────────────────────────────────

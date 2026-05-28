@@ -7,6 +7,7 @@ import { StaffFilters, type StaffFiltersState } from '@/components/staff/StaffFi
 import { StaffTable } from '@/components/staff/StaffTable';
 import { ImportModal } from '@/components/staff/ImportModal';
 import { LeaveModal } from '@/components/staff/LeaveModal';
+import { LicModal } from '@/components/staff/LicModal';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
@@ -33,6 +34,7 @@ export default function StaffList() {
   const [deleting, setDeleting] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [leaveTarget, setLeaveTarget] = useState<StaffRecord | null>(null);
+  const [licTarget, setLicTarget]     = useState<StaffRecord | null>(null);
 
   const filtered = useMemo(() => {
     const q = filters.search.trim().toUpperCase();
@@ -162,6 +164,7 @@ export default function StaffList() {
         isAdmin={isAdmin}
         onDelete={(s) => setDeleteTarget(s)}
         onLeave={(s) => setLeaveTarget(s)}
+        onLic={(s) => setLicTarget(s)}
         className="flex-1 min-h-0"
       />
 
@@ -187,6 +190,13 @@ export default function StaffList() {
         open={leaveTarget !== null}
         staff={leaveTarget}
         onClose={() => setLeaveTarget(null)}
+      />
+
+      {/* LIC Policy modal */}
+      <LicModal
+        open={licTarget !== null}
+        staff={licTarget}
+        onClose={() => setLicTarget(null)}
       />
 
       {/* Import modal */}

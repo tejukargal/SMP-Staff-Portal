@@ -6,11 +6,11 @@ import { DeptBadge, StatusBadge } from '@/components/ui/Badge';
 import { PageSpinner } from '@/components/ui/Spinner';
 import { StaffTable } from '@/components/staff/StaffTable';
 import { Table, Thead, Th, Tr, Td } from '@/components/ui/Table';
-import { formatDate, computeServiceYears } from '@/utils/dateUtils';
+import { formatDate, computeServiceYears, computeDOR } from '@/utils/dateUtils';
 import { exportStaffToExcel, exportReportToExcel } from '@/utils/exportUtils';
 import { exportReportPdf } from '@/utils/reportsPdf';
 import type { StaffRecord } from '@/types';
-import { DEPARTMENTS, STATUSES, DESIGNATIONS } from '@/constants/enums';
+import { DEPARTMENTS, STATUSES, DESIGNATIONS, DEPT_COLORS } from '@/constants/enums';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -20,7 +20,8 @@ type ReportKey =
   | 'service-register'
   | 'seniority'
   | 'by-designation'
-  | 'contact-dir';
+  | 'contact-dir'
+  | 'dor-list';
 
 interface ReportDef { key: ReportKey; label: string; title: string; }
 
@@ -31,6 +32,7 @@ const REPORTS: ReportDef[] = [
   { key: 'seniority',        label: 'Seniority List',   title: 'Seniority List' },
   { key: 'by-designation',   label: 'By Designation',   title: 'Staff by Designation' },
   { key: 'contact-dir',      label: 'Contact Directory',title: 'Contact Directory' },
+  { key: 'dor-list',         label: 'DOR List',         title: 'Date of Retirement List' },
 ];
 
 // ── Base dataset per report ────────────────────────────────────────────────────
@@ -42,15 +44,22 @@ function getBaseData(key: ReportKey, staff: StaffRecord[]): StaffRecord[] {
     case 'seniority':        return [...staff].sort((a, b) => a.doe.localeCompare(b.doe));
     case 'by-designation':   return [...staff].sort((a, b) => a.designation.localeCompare(b.designation) || a.name.localeCompare(b.name));
     case 'contact-dir':      return [...staff].sort((a, b) => a.name.localeCompare(b.name));
+    case 'dor-list':         return [...staff].sort((a, b) => {
+      const da = computeDOR(a.dob) || a.dor || '';
+      const db = computeDOR(b.dob) || b.dor || '';
+      return da.localeCompare(db);
+    });
     default:                 return [...staff].sort((a, b) => a.name.localeCompare(b.name));
   }
 }
 
 function toExportRow(key: ReportKey, s: StaffRecord): Record<string, unknown> {
+  if (key === 'dor-list')
+    return { NAME: s.name, 'EMP ID': s.empId, DESIGNATION: s.designation, DEPT: s.dept, STATUS: s.status, DOB: formatDate(s.dob), DOR: formatDate(computeDOR(s.dob) || s.dor) };
   if (key === 'contact-dir')
     return { NAME: s.name, DEPT: s.dept, TYPE: s.type, PHONE: s.phone, EMAIL: s.email };
   if (key === 'service-register')
-    return { NAME: s.name, 'EMP ID': s.empId, DEPT: s.dept, DOE: formatDate(s.doe), DOR: formatDate(s.dor), 'SERVICE YEARS': computeServiceYears(s.doe) };
+    return { NAME: s.name, 'EMP ID': s.empId, DEPT: s.dept, DOB: formatDate(s.dob), DOE: formatDate(s.doe), DOR: formatDate(computeDOR(s.dob) || s.dor), 'SERVICE YEARS': computeServiceYears(s.doe) };
   return { NAME: s.name, 'EMP ID': s.empId, DESIGNATION: s.designation, TYPE: s.type, DEPT: s.dept, STATUS: s.status, CATEGORY: s.category ?? '', DOE: formatDate(s.doe) };
 }
 
@@ -129,6 +138,14 @@ export default function Reports() {
       return true;
     });
   }, [active, staff, search, fDept, fType, fStatus, fDesig, fCategory]);
+
+  const chipStats = useMemo(() => {
+    const teaching = displayData.filter(s => s.type === 'TEACHING').length;
+    const deptCounts = DEPARTMENTS
+      .map(d => ({ dept: d, count: displayData.filter(s => s.dept === d).length }))
+      .filter(d => d.count > 0);
+    return { teaching, nonTeaching: displayData.length - teaching, deptCounts };
+  }, [displayData]);
 
   const activeDef  = REPORTS.find(r => r.key === active)!;
   const hasFilters = !!(search || fDept || fType || fStatus || fDesig || fCategory);
@@ -291,6 +308,35 @@ export default function Reports() {
         </span>
       </div>
 
+      {/* ── Count chips ──────────────────────────────────────────────────────── */}
+      <div className="flex-shrink-0 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-1 bg-white/80 border border-sky-100 rounded-full px-2.5 py-0.5 shrink-0" style={{ boxShadow: '0 1px 3px rgba(14,165,233,0.07)' }}>
+          <span className="text-[11px] text-sky-500 font-semibold">Total</span>
+          <span className="text-[11px] font-bold text-gray-800" key={displayData.length} style={{ animation: 'stat-pop 0.28s ease-out' }}>{displayData.length}</span>
+        </div>
+        <span className="text-sky-200 text-xs select-none shrink-0">·</span>
+        <div className="flex items-center gap-1 bg-white/80 border border-sky-100 rounded-full px-2.5 py-0.5 shrink-0">
+          <span className="text-[11px] text-gray-500 font-medium">Teaching</span>
+          <span className="text-[11px] font-bold text-gray-800" key={`t-${chipStats.teaching}`} style={{ animation: 'stat-pop 0.28s ease-out' }}>{chipStats.teaching}</span>
+        </div>
+        <div className="flex items-center gap-1 bg-white/80 border border-sky-100 rounded-full px-2.5 py-0.5 shrink-0">
+          <span className="text-[11px] text-gray-500 font-medium">Non-Teaching</span>
+          <span className="text-[11px] font-bold text-gray-800" key={`nt-${chipStats.nonTeaching}`} style={{ animation: 'stat-pop 0.28s ease-out' }}>{chipStats.nonTeaching}</span>
+        </div>
+        {chipStats.deptCounts.length > 0 && (
+          <>
+            <span className="text-sky-200 text-xs select-none shrink-0">·</span>
+            {chipStats.deptCounts.map(({ dept, count }) => (
+              <div key={dept} className="flex items-center gap-1 bg-white/80 border border-sky-100 rounded-full px-2.5 py-0.5 shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: DEPT_COLORS[dept] }} />
+                <span className="text-[11px] text-gray-600 font-medium">{dept}</span>
+                <span className="text-[11px] font-bold text-gray-800" key={`${dept}-${count}`} style={{ animation: 'stat-pop 0.28s ease-out' }}>{count}</span>
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+
       {/* ── Report title ─────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0">
         <h2 className="text-sm font-bold text-gray-700">{activeDef.title}</h2>
@@ -323,6 +369,36 @@ function ReportTable({ reportKey, data }: { reportKey: ReportKey; data: StaffRec
     return <div className="py-16 text-center text-sm text-gray-300">No records match the current filters</div>;
   }
 
+  if (reportKey === 'dor-list') {
+    return (
+      <Table>
+        <Thead>
+          <tr>
+            <Th>Sl</Th><Th>Name</Th><Th>Emp ID</Th><Th>Designation</Th>
+            <Th>Dept</Th><Th>Status</Th><Th className="text-center">DOB</Th><Th className="text-center">DOR</Th>
+          </tr>
+        </Thead>
+        <tbody>
+          {data.map((s, i) => {
+            const dor = computeDOR(s.dob) || s.dor;
+            return (
+              <Tr key={s.id}>
+                <Td className="font-mono text-xs text-gray-400 w-10">{i + 1}</Td>
+                <Td><span className="font-medium">{s.name}</span></Td>
+                <Td className="font-mono text-xs">{s.empId}</Td>
+                <Td className="text-xs">{s.designation}</Td>
+                <Td><DeptBadge dept={s.dept} /></Td>
+                <Td><StatusBadge status={s.status} /></Td>
+                <Td className="text-xs text-gray-400 text-center font-mono">{formatDate(s.dob)}</Td>
+                <Td className="text-xs text-center font-mono font-semibold text-gray-700">{formatDate(dor)}</Td>
+              </Tr>
+            );
+          })}
+        </tbody>
+      </Table>
+    );
+  }
+
   if (reportKey === 'contact-dir') {
     return (
       <Table>
@@ -346,19 +422,23 @@ function ReportTable({ reportKey, data }: { reportKey: ReportKey; data: StaffRec
   if (reportKey === 'service-register') {
     return (
       <Table>
-        <Thead><tr><Th>Sl</Th><Th>Name</Th><Th>Emp ID</Th><Th>Dept</Th><Th>DOE</Th><Th>DOR</Th><Th>Service Years</Th></tr></Thead>
+        <Thead><tr><Th>Sl</Th><Th>Name</Th><Th>Emp ID</Th><Th>Dept</Th><Th className="text-center">DOB</Th><Th className="text-center">DOE</Th><Th className="text-center">DOR</Th><Th>Service Years</Th></tr></Thead>
         <tbody>
-          {data.map((s, i) => (
-            <Tr key={s.id}>
-              <Td className="font-mono text-xs text-gray-400 w-10">{i + 1}</Td>
-              <Td className="font-medium">{s.name}</Td>
-              <Td className="font-mono text-xs">{s.empId}</Td>
-              <Td><DeptBadge dept={s.dept} /></Td>
-              <Td>{formatDate(s.doe)}</Td>
-              <Td>{formatDate(s.dor)}</Td>
-              <Td className="tabular-nums">{computeServiceYears(s.doe)} yrs</Td>
-            </Tr>
-          ))}
+          {data.map((s, i) => {
+            const dor = computeDOR(s.dob) || s.dor;
+            return (
+              <Tr key={s.id}>
+                <Td className="font-mono text-xs text-gray-400 w-10">{i + 1}</Td>
+                <Td className="font-medium">{s.name}</Td>
+                <Td className="font-mono text-xs">{s.empId}</Td>
+                <Td><DeptBadge dept={s.dept} /></Td>
+                <Td className="text-xs text-gray-400 text-center font-mono">{formatDate(s.dob)}</Td>
+                <Td className="text-center">{formatDate(s.doe)}</Td>
+                <Td className="text-center font-mono font-semibold text-gray-700">{formatDate(dor)}</Td>
+                <Td className="tabular-nums">{computeServiceYears(s.doe)} yrs</Td>
+              </Tr>
+            );
+          })}
         </tbody>
       </Table>
     );

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { CalendarDays, TrendingDown, Search, Filter, Plus, Pencil, Trash2, X, RefreshCw } from 'lucide-react';
 import {
   getAllStaff,
@@ -100,8 +100,8 @@ function EntryModal({ open, editing, staffList, onClose, onSaved }: EntryModalPr
     setError('');
 
     const errs = { from: '', to: '' };
-    if (!fromIso) errs.from = 'Invalid date (dd/mm/yy)';
-    if (!toIso)   errs.to   = 'Invalid date (dd/mm/yy)';
+    if (!fromIso) errs.from = 'Invalid date (dd/mm/yyyy)';
+    if (!toIso)   errs.to   = 'Invalid date (dd/mm/yyyy)';
     if (toIso && fromIso && toIso < fromIso) errs.to = 'Must be ≥ From date';
     if (errs.from || errs.to) { setDateErrors(errs); return; }
     if (!isEdit && !selectedStaffId) { setError('Select a staff member.'); return; }
@@ -389,6 +389,8 @@ export default function LeaveRecords() {
   const [entryOpen, setEntryOpen]   = useState(false);
   const [editRecord, setEditRecord] = useState<LeaveRecord | null>(null);
   const [deleteRecord, setDeleteRecord] = useState<LeaveRecord | null>(null);
+  const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; record: LeaveRecord } | null>(null);
+  const ctxRef = useRef<HTMLDivElement>(null);
 
   // Fetch per-staff (individual collection cache is up-to-date after writes)
   const loadRecords = useCallback(async (silent = false) => {
@@ -435,8 +437,19 @@ export default function LeaveRecords() {
     el:  filtered.filter(r => r.type === 'EL').reduce((s, r) => s + r.days, 0),
   }), [filtered]);
 
-  const recent = useMemo(() => records.slice(0, 8), [records]);
   const hasFilters = !!(search || typeFilter || deptFilter || monthFilter);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (ctxRef.current && !ctxRef.current.contains(e.target as Node)) {
+        setCtxMenu(null);
+      }
+    }
+    if (ctxMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [ctxMenu]);
 
   function openAdd() { setEditRecord(null); setEntryOpen(true); }
   function openEdit(rec: LeaveRecord) { setEditRecord(rec); setEntryOpen(true); }
@@ -479,33 +492,6 @@ export default function LeaveRecords() {
           <SummaryCard label="HPL Days Used" value={summary.hpl}  icon={<TrendingDown className="w-4 h-4" />} accent="#16A34A" bg="#F0FDF4" />
           <SummaryCard label="EL Days Used"  value={summary.el}   icon={<TrendingDown className="w-4 h-4" />} accent="#EA580C" bg="#FFF7ED" />
         </div>
-
-        {/* Recent strip */}
-        {recent.length > 0 && !hasFilters && (
-          <div className="flex-shrink-0">
-            <p className="text-[11px] font-semibold text-[#6B7280] uppercase tracking-wide mb-1.5">Recent Entries</p>
-            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-              {recent.map(r => (
-                <div
-                  key={r.id}
-                  className="shrink-0 rounded-xl border border-[#E5E7EB] bg-white px-3 py-2 flex flex-col gap-0.5 min-w-[148px]"
-                  style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[11px] font-semibold text-[#111827] truncate max-w-[90px]">{r.staffName ?? r.staffId}</span>
-                    <LeaveTypeBadge type={r.type} />
-                  </div>
-                  <span className="text-[10px] text-[#9CA3AF] font-mono">
-                    {fmtDate(r.fromDate)}{r.fromDate !== r.toDate ? ` – ${fmtDate(r.toDate)}` : ''}
-                  </span>
-                  <span className="text-[10px] text-[#6B7280]">
-                    {r.days} day{r.days !== 1 ? 's' : ''}{r.dayType === 'HALF' ? ' (½)' : ''}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Filters */}
         <div className="flex-shrink-0 flex flex-wrap gap-2 items-center">
@@ -588,14 +574,17 @@ export default function LeaveRecords() {
                   <th className="px-4 py-2.5 text-center font-semibold text-[#6B7280]">Days</th>
                   <th className="px-4 py-2.5 text-center font-semibold text-[#6B7280]">Half?</th>
                   <th className="px-4 py-2.5 text-left font-semibold text-[#6B7280]">Note</th>
-                  <th className="px-4 py-2.5 text-center font-semibold text-[#6B7280]">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((rec, i) => (
                   <tr
                     key={rec.id}
-                    className={`border-b border-[#F3F4F6] last:border-0 hover:bg-[#F7F8FA] transition-colors ${i % 2 === 1 ? 'bg-[#FAFAFA]' : ''}`}
+                    onContextMenu={e => {
+                      e.preventDefault();
+                      setCtxMenu({ x: e.clientX, y: e.clientY, record: rec });
+                    }}
+                    className={`border-b border-[#F3F4F6] last:border-0 hover:bg-[#F7F8FA] transition-colors cursor-context-menu select-none ${i % 2 === 1 ? 'bg-[#FAFAFA]' : ''}`}
                   >
                     <td className="px-4 py-2.5 font-medium text-[#111827]">{rec.staffName ?? '—'}</td>
                     <td className="px-4 py-2.5 font-mono text-[#6B7280]">{rec.empId ?? '—'}</td>
@@ -608,26 +597,6 @@ export default function LeaveRecords() {
                     <td className="px-4 py-2.5 text-center font-semibold text-[#374151]">{rec.days}</td>
                     <td className="px-4 py-2.5 text-center text-[#9CA3AF]">{rec.dayType === 'HALF' ? '½' : '—'}</td>
                     <td className="px-4 py-2.5 text-[#6B7280] max-w-[140px] truncate">{rec.note ?? '—'}</td>
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => openEdit(rec)}
-                          title="Edit"
-                          className="w-6 h-6 flex items-center justify-center rounded-md text-[#9CA3AF] hover:text-[#2563EB] hover:bg-[#EFF6FF] transition-colors"
-                        >
-                          <Pencil className="w-3 h-3" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDeleteRecord(rec)}
-                          title="Delete"
-                          className="w-6 h-6 flex items-center justify-center rounded-md text-[#9CA3AF] hover:text-red-500 hover:bg-red-50 transition-colors"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -648,6 +617,32 @@ export default function LeaveRecords() {
         onClose={() => setDeleteRecord(null)}
         onDeleted={() => void loadRecords(true)}
       />
+
+      {ctxMenu && (
+        <div
+          ref={ctxRef}
+          className="fixed z-50 bg-white rounded-xl shadow-lg border border-[#E5E7EB] py-1 min-w-[140px]"
+          style={{ top: ctxMenu.y, left: ctxMenu.x }}
+        >
+          <button
+            type="button"
+            onClick={() => { openEdit(ctxMenu.record); setCtxMenu(null); }}
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-[#374151] hover:bg-[#EFF6FF] hover:text-[#2563EB] transition-colors"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+            Edit Record
+          </button>
+          <div className="my-1 border-t border-[#F3F4F6]" />
+          <button
+            type="button"
+            onClick={() => { setDeleteRecord(ctxMenu.record); setCtxMenu(null); }}
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-red-500 hover:bg-red-50 transition-colors"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Delete Record
+          </button>
+        </div>
+      )}
     </>
   );
 }

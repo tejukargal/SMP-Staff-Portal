@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Pencil, Printer } from 'lucide-react';
+import { Pencil } from 'lucide-react';
 import { DeptBadge, StatusBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { formatDate, computeServiceYears } from '@/utils/dateUtils';
@@ -75,14 +75,6 @@ export function StaffCard({ staff, isAdmin }: Props) {
             Edit Record
           </Button>
         )}
-        <Button
-          variant="secondary"
-          className="w-full justify-center"
-          onClick={() => window.print()}
-        >
-          <Printer className="w-3.5 h-3.5" />
-          Print Profile
-        </Button>
       </div>
     </div>
   );

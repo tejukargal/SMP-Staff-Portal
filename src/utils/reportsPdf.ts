@@ -339,7 +339,8 @@ export function exportContactDirPdf(staff: StaffRecord[], filters: { search?: st
 
 export type ReportKey =
   | 'staff-list' | 'retired' | 'service-register'
-  | 'seniority'  | 'by-designation' | 'contact-dir';
+  | 'seniority'  | 'by-designation' | 'contact-dir'
+  | 'dor-list';
 
 export function exportReportPdf(
   key: ReportKey,
@@ -353,5 +354,6 @@ export function exportReportPdf(
     case 'seniority':        return exportSeniorityListPdf(data, filters);
     case 'by-designation':   return exportByDesignationPdf(data, filters);
     case 'contact-dir':      return exportContactDirPdf(data, filters);
+    case 'dor-list':         return exportServiceRegisterPdf(data, filters);
   }
 }
