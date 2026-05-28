@@ -18,6 +18,11 @@ service cloud.firestore {
     match /staff/{docId} {
       allow read: if isAuthenticated();
       allow create, update, delete: if isAdmin();
+
+      match /leaveRecords/{recordId} {
+        allow read: if isAuthenticated();
+        allow create, update, delete: if isAdmin();
+      }
     }
 
     match /users/{uid} {

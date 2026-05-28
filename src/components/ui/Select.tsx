@@ -19,10 +19,10 @@ export function Select({ label, error, options, placeholder, className = '', ...
       <select
         {...props}
         className={[
-          'w-full px-3 py-2 text-sm rounded-md border bg-white text-[#111827]',
-          'focus:outline-none focus:ring-2 focus:ring-[#1B3A6B] focus:border-transparent',
-          'disabled:bg-[#F9FAFB] disabled:text-[#6B7280] disabled:cursor-not-allowed',
-          error ? 'border-[#DC2626]' : 'border-[#E2E5EA]',
+          'w-full px-3 py-2 text-sm rounded-lg border bg-white text-gray-900',
+          'focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-transparent',
+          'disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed',
+          error ? 'border-red-400' : 'border-gray-200',
           className,
         ].join(' ')}
       >

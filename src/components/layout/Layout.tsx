@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { useAuth } from '@/hooks/useAuth';
@@ -26,12 +26,13 @@ const SIDEBAR_W_COLLAPSED = 64;
 function Layout() {
   const [collapsed, setCollapsed] = useState(false);
   const sw = collapsed ? SIDEBAR_W_COLLAPSED : SIDEBAR_W;
+  const { pathname } = useLocation();
 
   return (
-    <div className="min-h-screen flex">
+    <div className="h-screen overflow-hidden flex">
       <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((c) => !c)} />
       <div
-        className="flex flex-col min-h-screen"
+        className="flex-1 flex flex-col overflow-hidden min-w-0"
         style={{
           marginLeft: sw,
           width: `calc(100vw - ${sw}px)`,
@@ -41,13 +42,16 @@ function Layout() {
       >
         <Header sidebarWidth={sw} />
         <main
-          className="flex-1 p-6 overflow-y-auto"
-          style={{
-            marginTop: 56,
-            animation: 'page-enter 0.22s ease-out',
-          }}
+          className="flex-1 min-h-0 p-6 overflow-y-auto"
+          style={{ marginTop: 56 }}
         >
-          <Outlet />
+          <div
+            key={pathname}
+            className="h-full flex flex-col"
+            style={{ animation: 'page-enter 0.22s ease-out' }}
+          >
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

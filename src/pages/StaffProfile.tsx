@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { StaffCard } from '@/components/staff/StaffCard';
 import { Button } from '@/components/ui/Button';
@@ -33,6 +33,8 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
 export default function StaffProfile() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { state } = useLocation();
+  const fromDashboard = (state as { from?: string } | null)?.from === 'dashboard';
   const { isAdmin } = useRole();
   const { showToast } = useToast();
 
@@ -57,7 +59,7 @@ export default function StaffProfile() {
   if (!staff) return (
     <div className="text-center py-16 text-[#6B7280]">
       Staff record not found.{' '}
-      <button onClick={() => navigate('/staff')} className="text-[#1B3A6B] underline">
+      <button onClick={() => navigate('/staff')} className="text-sky-600 underline">
         Go back
       </button>
     </div>
@@ -76,9 +78,14 @@ export default function StaffProfile() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Button variant="ghost" size="sm" className="self-start no-print" onClick={() => navigate('/staff')}>
+      <Button
+        variant="secondary"
+        size="sm"
+        className="self-start no-print"
+        onClick={() => navigate(fromDashboard ? '/dashboard' : '/staff')}
+      >
         <ArrowLeft className="w-3.5 h-3.5" />
-        Back to Staff List
+        {fromDashboard ? 'Back to Dashboard' : 'Back to Staff List'}
       </Button>
 
       <div className="grid grid-cols-3 gap-6">
@@ -98,8 +105,8 @@ export default function StaffProfile() {
                 className={[
                   'px-5 py-3.5 text-sm font-medium transition-colors border-b-2 -mb-px',
                   activeTab === tab.key
-                    ? 'border-[#1B3A6B] text-[#1B3A6B]'
-                    : 'border-transparent text-[#6B7280] hover:text-[#111827]',
+                    ? 'border-sky-500 text-sky-600'
+                    : 'border-transparent text-gray-400 hover:text-gray-700',
                 ].join(' ')}
               >
                 {tab.label}
@@ -149,7 +156,7 @@ export default function StaffProfile() {
                   {isAdmin && (
                     <button
                       onClick={() => setRevealed((r) => !r)}
-                      className="flex items-center gap-1.5 text-xs text-[#6B7280] hover:text-[#1B3A6B] transition-colors"
+                      className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-sky-600 transition-colors"
                     >
                       {revealed ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                       {revealed ? 'Mask fields' : 'Reveal fields'}
@@ -177,7 +184,7 @@ export default function StaffProfile() {
                 <Row label="Basic Pay" value={basicPay ? formatINR(basicPay) : '—'} />
                 <Row label={`DA (${da}%)`} value={daAmount ? formatINR(daAmount) : '—'} />
                 <Row label={`HRA (${hra}%)`} value={hraAmount ? formatINR(hraAmount) : '—'} />
-                <Row label="Gross Salary" value={<span className="font-bold text-[#1B3A6B]">{gross ? formatINR(gross) : '—'}</span>} />
+                <Row label="Gross Salary" value={<span className="font-bold text-sky-700">{gross ? formatINR(gross) : '—'}</span>} />
                 <Row label="NPS Deduction" value={nps ? formatINR(nps) : '—'} />
                 <Row label="Professional Tax" value={pt ? formatINR(pt) : '—'} />
                 <Row label="Net Salary" value={<span className="font-bold text-[#16A34A]">{net ? formatINR(net) : '—'}</span>} />

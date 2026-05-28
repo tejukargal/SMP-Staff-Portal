@@ -1,6 +1,7 @@
 import {
   getFirestore,
   collection,
+  collectionGroup,
   doc,
   getDocs,
   getDoc,
@@ -17,7 +18,7 @@ import {
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { app } from './config';
-import type { StaffRecord, UserRecord } from '@/types';
+import type { StaffRecord, UserRecord, LeaveBalance, LeaveRecord } from '@/types';
 
 export const db = getFirestore(app);
 
@@ -85,6 +86,60 @@ export async function deleteAllStaff(): Promise<number> {
 export async function isEmpIdUnique(empId: string, excludeId?: string): Promise<boolean> {
   const all = await getAllStaff();
   return !all.some((s) => s.empId === empId && s.id !== excludeId);
+}
+
+// ── Leave ──────────────────────────────────────────────────────────────
+
+export async function getLeaveBalance(staffId: string): Promise<LeaveBalance> {
+  const snap = await getDoc(doc(db, 'staff', staffId));
+  const bal = snap.exists() ? (snap.data().leaveBalance as LeaveBalance | undefined) : undefined;
+  return bal ?? { cl: 0, hpl: 0, el: 0 };
+}
+
+export async function updateLeaveBalance(staffId: string, balance: LeaveBalance): Promise<void> {
+  await updateDoc(doc(db, 'staff', staffId), { leaveBalance: balance, updatedAt: serverTimestamp() });
+}
+
+function leaveFromDoc(snap: QueryDocumentSnapshot<DocumentData>): LeaveRecord {
+  return { id: snap.id, ...snap.data() } as LeaveRecord;
+}
+
+export async function getLeaveRecords(staffId: string): Promise<LeaveRecord[]> {
+  const snap = await getDocs(collection(db, 'staff', staffId, 'leaveRecords'));
+  return snap.docs
+    .map(leaveFromDoc)
+    .sort((a, b) => b.fromDate.localeCompare(a.fromDate));
+}
+
+export async function getAllLeaveRecords(): Promise<LeaveRecord[]> {
+  const snap = await getDocs(collectionGroup(db, 'leaveRecords'));
+  return snap.docs
+    .map(leaveFromDoc)
+    .sort((a, b) => b.fromDate.localeCompare(a.fromDate));
+}
+
+
+export async function addLeaveRecord(
+  staffId: string,
+  data: Omit<LeaveRecord, 'id' | 'createdAt'>,
+): Promise<string> {
+  const ref = await addDoc(collection(db, 'staff', staffId, 'leaveRecords'), {
+    ...data,
+    createdAt: serverTimestamp(),
+  });
+  return ref.id;
+}
+
+export async function updateLeaveRecord(
+  staffId: string,
+  recordId: string,
+  data: Partial<Omit<LeaveRecord, 'id' | 'createdAt'>>,
+): Promise<void> {
+  await updateDoc(doc(db, 'staff', staffId, 'leaveRecords', recordId), data as DocumentData);
+}
+
+export async function deleteLeaveRecord(staffId: string, recordId: string): Promise<void> {
+  await deleteDoc(doc(db, 'staff', staffId, 'leaveRecords', recordId));
 }
 
 // ── Users ──────────────────────────────────────────────────────────────

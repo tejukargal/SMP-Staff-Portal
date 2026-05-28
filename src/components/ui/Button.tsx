@@ -11,13 +11,13 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 
 const VARIANT_STYLES: Record<Variant, string> = {
   primary:
-    'bg-[#1B3A6B] text-white hover:bg-[#142D55] border border-[#1B3A6B] hover:border-[#142D55]',
+    'bg-sky-600 text-white hover:bg-sky-700 border border-transparent shadow-sm',
   secondary:
-    'bg-white text-[#1B3A6B] border border-[#E2E5EA] hover:bg-[#F7F8FA]',
+    'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200 shadow-sm',
   danger:
-    'bg-[#DC2626] text-white hover:bg-red-700 border border-[#DC2626]',
+    'bg-red-500 text-white hover:bg-red-600 border border-transparent shadow-sm',
   ghost:
-    'bg-transparent text-[#6B7280] hover:bg-[#F7F8FA] border border-transparent',
+    'bg-transparent text-gray-500 hover:bg-sky-50 hover:text-sky-700 border border-transparent',
 };
 
 const SIZE_STYLES: Record<Size, string> = {
@@ -38,8 +38,8 @@ export function Button({
     <button
       disabled={disabled || loading}
       className={[
-        'inline-flex items-center gap-2 rounded-md font-medium transition-colors duration-150 cursor-pointer',
-        'focus:outline-none focus:ring-2 focus:ring-[#1B3A6B] focus:ring-offset-1',
+        'inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-colors duration-150 cursor-pointer',
+        'focus:outline-none focus:ring-2 focus:ring-sky-400 focus:ring-offset-1',
         'disabled:opacity-50 disabled:cursor-not-allowed',
         VARIANT_STYLES[variant],
         SIZE_STYLES[size],

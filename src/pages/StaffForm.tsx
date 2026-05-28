@@ -194,16 +194,12 @@ export default function StaffForm() {
 
   return (
     <>
-      <form id="staff-form" onSubmit={(e) => { void handleSubmit(e); }} className="flex flex-col gap-4 max-w-5xl pb-16">
+      <form id="staff-form" onSubmit={(e) => { void handleSubmit(e); }} className="flex flex-col gap-4 w-full pb-16">
       <div className="flex items-center gap-3 mb-1">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-1.5 text-sm text-[#6B7280] hover:text-[#1B3A6B] transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
+        <Button type="button" variant="secondary" size="sm" onClick={() => navigate(-1)}>
+          <ArrowLeft className="w-3.5 h-3.5" />
           Back
-        </button>
+        </Button>
         <h2 className="text-lg font-semibold text-[#111827]" style={{ fontFamily: "'DM Serif Display', serif" }}>
           {isEdit ? 'Edit Staff Record' : 'Add New Staff'}
         </h2>
@@ -251,7 +247,7 @@ export default function StaffForm() {
                   value={t}
                   checked={form.type === t}
                   onChange={() => set('type', t)}
-                  className="accent-[#1B3A6B]"
+                  className="accent-sky-500"
                 />
                 <span className="text-sm text-[#374151]">{t}</span>
               </label>
@@ -280,7 +276,7 @@ export default function StaffForm() {
             value={form.remarks ?? ''}
             onChange={(e) => set('remarks', e.target.value)}
             rows={2}
-            className="w-full px-3 py-2 text-sm rounded-md border border-[#E2E5EA] bg-white focus:outline-none focus:ring-2 focus:ring-[#1B3A6B] resize-none"
+            className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-sky-400 resize-none"
           />
         </div>
       </ColorSection>
@@ -429,8 +425,8 @@ export default function StaffForm() {
 
       {/* Footer bar — fixed, always visible, left-offset matches sidebar width via CSS var */}
       <div
-        className="fixed bottom-0 right-0 z-20 flex items-center gap-3 bg-white h-13 px-5 no-print"
-        style={{ left: 'var(--sidebar-w)', borderTop: '1px solid #E2E5EA', boxShadow: '0 -1px 6px 0 rgba(27,58,107,0.06)' }}
+        className="fixed bottom-0 right-0 z-20 flex items-center gap-3 h-13 px-5 no-print"
+        style={{ left: 'var(--sidebar-w)', background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(12px)', borderTop: '1px solid #BAE6FD', boxShadow: '0 -1px 8px 0 rgba(14,165,233,0.07)' }}
       >
         {/* Validation error pills on the left */}
         {errorKeys.length > 0 && (

@@ -1,5 +1,29 @@
 import type { Timestamp } from 'firebase/firestore';
 
+export type LeaveType = 'CL' | 'HPL' | 'EL';
+export type DayType = 'FULL' | 'HALF';
+
+export interface LeaveBalance {
+  cl: number;
+  hpl: number;
+  el: number;
+}
+
+export interface LeaveRecord {
+  id?: string;
+  staffId: string;
+  staffName?: string;
+  empId?: string;
+  dept?: string;
+  type: LeaveType;
+  fromDate: string;
+  toDate: string;
+  dayType: DayType;
+  days: number;
+  note?: string;
+  createdAt: Timestamp;
+}
+
 export type DesignationEnum =
   | 'PRINCIPAL'
   | 'SUPDT.'
@@ -62,6 +86,7 @@ export interface StaffRecord {
   approvalOrderNumber?: string;
   dateOfApproval?: string;
   arrearsTakenFrom?: string;
+  leaveBalance?: LeaveBalance;
 }
 
 export interface UserRecord {

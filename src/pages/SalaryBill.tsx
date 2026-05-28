@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Printer, Download } from 'lucide-react';
+import { Printer, Download, ArrowLeft } from 'lucide-react';
 import { useStaff } from '@/hooks/useStaff';
 import { SalaryTable } from '@/components/salary/SalaryTable';
 import { SalaryBillPrint } from '@/components/salary/SalaryBillPrint';
@@ -163,7 +163,8 @@ export default function SalaryBill() {
             </div>
             <div className="flex gap-2">
               <Button variant="secondary" size="sm" onClick={() => setStep(1)}>
-                ← Back
+                <ArrowLeft className="w-3.5 h-3.5" />
+                Back
               </Button>
               <Button
                 variant="secondary"

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, Pencil, Trash2 } from 'lucide-react';
+import { Eye, Pencil, Trash2, CalendarDays } from 'lucide-react';
 import { Table, Thead, Th, Tr, Td } from '@/components/ui/Table';
 import { DeptBadge, StatusBadge } from '@/components/ui/Badge';
 import { SkeletonRow } from '@/components/ui/Spinner';
@@ -12,8 +12,9 @@ interface Props {
   loading: boolean;
   isAdmin: boolean;
   onDelete: (staff: StaffRecord) => void;
+  onLeave: (staff: StaffRecord) => void;
   startIndex?: number;
-  theadTop?: number;
+  className?: string;
 }
 
 interface ContextMenu {
@@ -22,7 +23,7 @@ interface ContextMenu {
   record: StaffRecord;
 }
 
-export function StaffTable({ staff, loading, isAdmin, onDelete, startIndex = 1, theadTop = 0 }: Props) {
+export function StaffTable({ staff, loading, isAdmin, onDelete, onLeave, startIndex = 1, className }: Props) {
   const navigate = useNavigate();
   const [ctx, setCtx] = useState<ContextMenu | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -30,14 +31,17 @@ export function StaffTable({ staff, loading, isAdmin, onDelete, startIndex = 1, 
   // Close on outside click, Escape, or scroll
   useEffect(() => {
     if (!ctx) return;
-    const close = () => setCtx(null);
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
+    const close = (e: MouseEvent) => {
+      if (menuRef.current && menuRef.current.contains(e.target as Node)) return;
+      setCtx(null);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setCtx(null); };
     document.addEventListener('mousedown', close);
-    document.addEventListener('scroll', close, true);
+    document.addEventListener('scroll', close as EventListener, true);
     document.addEventListener('keydown', onKey);
     return () => {
       document.removeEventListener('mousedown', close);
-      document.removeEventListener('scroll', close, true);
+      document.removeEventListener('scroll', close as EventListener, true);
       document.removeEventListener('keydown', onKey);
     };
   }, [ctx]);
@@ -45,8 +49,8 @@ export function StaffTable({ staff, loading, isAdmin, onDelete, startIndex = 1, 
   function openCtx(e: React.MouseEvent, record: StaffRecord) {
     e.preventDefault();
     // Clamp so menu doesn't overflow viewport
-    const menuW = 160;
-    const menuH = isAdmin ? 114 : 42;
+    const menuW = 180;
+    const menuH = isAdmin ? 156 : 42;
     const x = Math.min(e.clientX, window.innerWidth  - menuW - 8);
     const y = Math.min(e.clientY, window.innerHeight - menuH - 8);
     setCtx({ x, y, record });
@@ -54,8 +58,8 @@ export function StaffTable({ staff, loading, isAdmin, onDelete, startIndex = 1, 
 
   return (
     <>
-      <Table>
-        <Thead top={theadTop}>
+      <Table className={className}>
+        <Thead>
           <tr>
             <Th>Sl</Th>
             <Th>Name</Th>
@@ -64,7 +68,7 @@ export function StaffTable({ staff, loading, isAdmin, onDelete, startIndex = 1, 
             <Th>Type</Th>
             <Th>Dept</Th>
             <Th>Status</Th>
-            <Th>DOE</Th>
+            <Th className="text-center">DOE</Th>
           </tr>
         </Thead>
         <tbody>
@@ -91,7 +95,7 @@ export function StaffTable({ staff, loading, isAdmin, onDelete, startIndex = 1, 
                 <Td className="text-xs text-[#6B7280]">{s.type}</Td>
                 <Td><DeptBadge dept={s.dept} /></Td>
                 <Td><StatusBadge status={s.status} /></Td>
-                <Td className="text-xs text-[#6B7280]">{formatDate(s.doe)}</Td>
+                <Td className="text-xs text-[#6B7280] text-center">{formatDate(s.doe)}</Td>
               </Tr>
             ))}
         </tbody>
@@ -101,7 +105,6 @@ export function StaffTable({ staff, loading, isAdmin, onDelete, startIndex = 1, 
       {ctx && (
         <div
           ref={menuRef}
-          onMouseDown={(e) => e.stopPropagation()}
           className="fixed z-50 min-w-40 rounded-lg border border-[#E2E5EA] bg-white shadow-xl py-1 text-sm"
           style={{ top: ctx.y, left: ctx.x, animation: 'modal-enter 0.12s ease-out' }}
         >
@@ -120,6 +123,13 @@ export function StaffTable({ staff, loading, isAdmin, onDelete, startIndex = 1, 
               >
                 <Pencil className="w-3.5 h-3.5 text-[#6B7280]" />
                 Edit
+              </button>
+              <button
+                onClick={() => { onLeave(ctx.record); setCtx(null); }}
+                className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-[#374151] hover:bg-[#F7F8FA] transition-colors"
+              >
+                <CalendarDays className="w-3.5 h-3.5 text-[#6B7280]" />
+                Leave Balances
               </button>
               <div className="my-1 border-t border-[#F3F4F6]" />
               <button
