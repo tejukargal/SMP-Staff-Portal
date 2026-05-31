@@ -18,7 +18,7 @@ import {
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { app } from './config';
-import type { StaffRecord, UserRecord, LeaveBalance, LeaveRecord, LicPolicy } from '@/types';
+import type { StaffRecord, UserRecord, LeaveBalance, LeaveRecord, LicPolicy, SanctionedPost, VacancyEvent } from '@/types';
 
 export const db = getFirestore(app);
 
@@ -211,4 +211,114 @@ export async function createUserDoc(_uid: string, data: Omit<UserRecord, 'uid'>)
 
 export async function updateUserRole(uid: string, role: 'admin' | 'viewer'): Promise<void> {
   await updateDoc(doc(db, 'users', uid), { role });
+}
+
+// ── Sanctioned Posts ───────────────────────────────────────────────────
+
+function sanctionedFromDoc(snap: QueryDocumentSnapshot<DocumentData>): SanctionedPost {
+  return { id: snap.id, ...snap.data() } as SanctionedPost;
+}
+
+export async function getSanctionedPosts(): Promise<SanctionedPost[]> {
+  const snap = await getDocs(collection(db, 'sanctionedPosts'));
+  return snap.docs.map(sanctionedFromDoc);
+}
+
+export async function upsertSanctionedPost(
+  dept: string,
+  designation: string,
+  sanctionedCount: number,
+): Promise<void> {
+  const id = `${dept}_${designation}`;
+  await setDoc(doc(db, 'sanctionedPosts', id), {
+    dept,
+    designation,
+    sanctionedCount,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+// ── Vacancy Events ─────────────────────────────────────────────────────
+
+function vacancyFromDoc(snap: QueryDocumentSnapshot<DocumentData>): VacancyEvent {
+  return { id: snap.id, ...snap.data() } as VacancyEvent;
+}
+
+export async function getVacancyEvents(dept?: string): Promise<VacancyEvent[]> {
+  const col = collection(db, 'vacancyEvents');
+  const snap = await getDocs(col);
+  const all = snap.docs.map(vacancyFromDoc);
+  return dept ? all.filter((e) => e.dept === dept) : all;
+}
+
+export async function addVacancyEvent(
+  data: Omit<VacancyEvent, 'id' | 'createdAt' | 'updatedAt'>,
+): Promise<string> {
+  const ref = await addDoc(collection(db, 'vacancyEvents'), {
+    ...data,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return ref.id;
+}
+
+export async function updateVacancyEvent(
+  id: string,
+  data: Partial<Omit<VacancyEvent, 'id' | 'createdAt'>>,
+): Promise<void> {
+  await updateDoc(doc(db, 'vacancyEvents', id), {
+    ...data,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function deleteVacancyEvent(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'vacancyEvents', id));
+}
+
+export async function confirmVacancyEvent(id: string): Promise<void> {
+  await updateDoc(doc(db, 'vacancyEvents', id), {
+    isPending: false,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function fillVacancyEvent(
+  id: string,
+  fillData: {
+    filledByStaffId: string;
+    filledByStaffName: string;
+    dateFilledOn: string;
+    appointmentType: 'DIRECT' | 'PROMOTION';
+    promotedFromDesignation?: string;
+    dept: string;
+    designation: string;
+  },
+): Promise<string | null> {
+  await updateDoc(doc(db, 'vacancyEvents', id), {
+    status: 'FILLED',
+    filledByStaffId:       fillData.filledByStaffId,
+    filledByStaffName:     fillData.filledByStaffName,
+    dateFilledOn:          fillData.dateFilledOn,
+    appointmentType:       fillData.appointmentType,
+    promotedFromDesignation: fillData.promotedFromDesignation ?? null,
+    updatedAt: serverTimestamp(),
+  });
+
+  if (fillData.appointmentType === 'PROMOTION' && fillData.promotedFromDesignation) {
+    const cascadeRef = await addDoc(collection(db, 'vacancyEvents'), {
+      dept:           fillData.dept,
+      designation:    fillData.promotedFromDesignation,
+      status:         'VACANT',
+      vacancyReason:  'PROMOTION_CHAIN',
+      vacatedByStaffId:   fillData.filledByStaffId,
+      vacatedByStaffName: fillData.filledByStaffName,
+      isPending:      false,
+      createdAt:      serverTimestamp(),
+      updatedAt:      serverTimestamp(),
+    });
+    await updateDoc(doc(db, 'vacancyEvents', id), { cascadeEventId: cascadeRef.id });
+    return cascadeRef.id;
+  }
+  return null;
 }

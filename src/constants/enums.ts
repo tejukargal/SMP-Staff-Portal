@@ -70,3 +70,17 @@ export const MONTHS = [
   'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
   'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER',
 ];
+
+export const APPOINTMENT_TYPE_LABELS: Record<string, string> = {
+  DIRECT:    'Direct',
+  PROMOTION: 'Promotion',
+};
+
+export const VACANCY_REASON_LABELS: Record<string, string> = {
+  RETIREMENT:      'Retirement',
+  RESIGNATION:     'Resignation',
+  TRANSFER:        'Transfer',
+  DECEASED:        'Deceased',
+  NEW_POST:        'New Sanctioned Post',
+  PROMOTION_CHAIN: 'Promotion (Cascade)',
+};

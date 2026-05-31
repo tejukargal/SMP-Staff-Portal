@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
+import { VacancyConfirmModal } from '@/components/vacancy/VacancyConfirmModal';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
@@ -9,7 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { addStaff, updateStaff, getStaffById, isEmpIdUnique, getAllStaff } from '@/firebase/firestore';
 import { computeDOR, getAge } from '@/utils/dateUtils';
 import { DESIGNATIONS, DEPARTMENTS, STATUSES } from '@/constants/enums';
-import type { StaffRecord, DesignationEnum, DeptEnum, StatusEnum, StaffType } from '@/types';
+import type { StaffRecord, DesignationEnum, DeptEnum, StatusEnum, StaffType, AppointmentType } from '@/types';
 import { PageSpinner } from '@/components/ui/Spinner';
 
 type FormErrors = Partial<Record<keyof StaffRecord, string>>;
@@ -110,6 +111,16 @@ export default function StaffForm() {
   const [fetching, setFetching] = useState(isEdit);
   const originalRef = useRef<Partial<StaffRecord>>(EMPTY);
 
+  // Vacancy auto-suggest state
+  const [vacancyPrompt, setVacancyPrompt] = useState<{
+    staffId: string;
+    staffName: string;
+    designation: string;
+    dept: string;
+    reason: 'RETIREMENT' | 'RESIGNATION' | 'TRANSFER' | 'DECEASED';
+    navigateTo: string;
+  } | null>(null);
+
   useEffect(() => {
     if (!isEdit || !id) return;
     setFetching(true);
@@ -165,12 +176,39 @@ export default function StaffForm() {
     setLoading(true);
     try {
       if (isEdit && id) {
+        const prevStatus = originalRef.current.status;
+        const newStatus = form.status;
         await updateStaff(id, {
           ...form,
           updatedAt: undefined as never,
         } as Partial<StaffRecord>);
         showToast('success', 'Staff record updated');
-        navigate(`/staff/${id}`);
+
+        // Auto-suggest vacancy when staff transitions out of IN SERVICE
+        const vacancyTriggerStatuses = ['RTRD', 'RESIGNED', 'TRANSFERRED', 'DECEASED'] as const;
+        type TriggerStatus = typeof vacancyTriggerStatuses[number];
+        const reasonMap: Record<TriggerStatus, 'RETIREMENT' | 'RESIGNATION' | 'TRANSFER' | 'DECEASED'> = {
+          RTRD:        'RETIREMENT',
+          RESIGNED:    'RESIGNATION',
+          TRANSFERRED: 'TRANSFER',
+          DECEASED:    'DECEASED',
+        };
+        if (
+          prevStatus === 'IN SERVICE' &&
+          newStatus &&
+          (vacancyTriggerStatuses as readonly string[]).includes(newStatus)
+        ) {
+          setVacancyPrompt({
+            staffId:     id,
+            staffName:   form.name ?? '',
+            designation: form.designation ?? '',
+            dept:        form.dept ?? '',
+            reason:      reasonMap[newStatus as TriggerStatus],
+            navigateTo:  `/staff/${id}`,
+          });
+        } else {
+          navigate(`/staff/${id}`);
+        }
       } else {
         const allStaff = await getAllStaff();
         const sl = allStaff.length + 1;
@@ -389,6 +427,25 @@ export default function StaffForm() {
             onChange={(e) => set('arrearsTakenFrom', e.target.value)}
           />
         </div>
+        <Select
+          label="Appointment Type"
+          value={form.appointmentType ?? ''}
+          onChange={(e) => set('appointmentType', e.target.value as AppointmentType || undefined as never)}
+          options={[
+            { value: 'DIRECT',    label: 'Direct' },
+            { value: 'PROMOTION', label: 'Promotion' },
+          ]}
+          placeholder="Select type"
+        />
+        {form.appointmentType === 'PROMOTION' && (
+          <Select
+            label="Promoted From Designation"
+            value={form.promotedFromDesignation ?? ''}
+            onChange={(e) => set('promotedFromDesignation', e.target.value as DesignationEnum)}
+            options={designationOptions}
+            placeholder="Select designation"
+          />
+        )}
       </ColorSection>
 
       {/* E — Financial & Compliance */}
@@ -426,6 +483,21 @@ export default function StaffForm() {
       </ColorSection>
 
       </form>
+
+      {/* Vacancy auto-suggest modal */}
+      {vacancyPrompt && (
+        <VacancyConfirmModal
+          staffId={vacancyPrompt.staffId}
+          staffName={vacancyPrompt.staffName}
+          designation={vacancyPrompt.designation}
+          dept={vacancyPrompt.dept}
+          reason={vacancyPrompt.reason}
+          onDone={() => {
+            setVacancyPrompt(null);
+            navigate(vacancyPrompt.navigateTo);
+          }}
+        />
+      )}
 
       {/* Footer bar — fixed, always visible, left-offset matches sidebar width via CSS var */}
       <div

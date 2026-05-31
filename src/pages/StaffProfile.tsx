@@ -233,6 +233,12 @@ export default function StaffProfile() {
                 {staff.arrearsTakenFrom    && <Row label="Arrears Taken From"  value={staff.arrearsTakenFrom} />}
                 <Row label="Pay Scale"   value={staff.payScale || '—'} />
                 <Row label="Basic Pay"   value={basicPay ? formatINR(basicPay) : '—'} />
+                {staff.appointmentType && (
+                  <Row label="Appointment Type" value={staff.appointmentType === 'DIRECT' ? 'Direct' : 'Promotion'} />
+                )}
+                {staff.promotedFromDesignation && (
+                  <Row label="Promoted From" value={staff.promotedFromDesignation} />
+                )}
                 {staff.remarks && <Row label="Remarks" value={staff.remarks} />}
               </div>
             )}

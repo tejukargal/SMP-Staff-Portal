@@ -3,6 +3,43 @@ import type { Timestamp } from 'firebase/firestore';
 export type LeaveType = 'CL' | 'HPL' | 'EL';
 export type DayType = 'FULL' | 'HALF';
 
+export type AppointmentType = 'DIRECT' | 'PROMOTION';
+
+export type VacancyReason =
+  | 'RETIREMENT'
+  | 'RESIGNATION'
+  | 'TRANSFER'
+  | 'DECEASED'
+  | 'NEW_POST'
+  | 'PROMOTION_CHAIN';
+
+export interface SanctionedPost {
+  id?: string;
+  dept: string;
+  designation: string;
+  sanctionedCount: number;
+  updatedAt?: Timestamp;
+}
+
+export interface VacancyEvent {
+  id?: string;
+  dept: string;
+  designation: string;
+  status: 'VACANT' | 'FILLED';
+  vacancyReason: VacancyReason;
+  vacatedByStaffId?: string;
+  vacatedByStaffName?: string;
+  filledByStaffId?: string;
+  filledByStaffName?: string;
+  dateFilledOn?: string;
+  appointmentType?: AppointmentType;
+  promotedFromDesignation?: string;
+  cascadeEventId?: string;
+  isPending: boolean;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
 export interface LeaveBalance {
   cl: number;
   hpl: number;
@@ -87,6 +124,8 @@ export interface StaffRecord {
   dateOfApproval?: string;
   arrearsTakenFrom?: string;
   leaveBalance?: LeaveBalance;
+  appointmentType?: AppointmentType;
+  promotedFromDesignation?: string;
 }
 
 export interface LicPolicy {

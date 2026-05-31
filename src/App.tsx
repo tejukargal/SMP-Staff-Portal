@@ -10,6 +10,7 @@ import Reports from '@/pages/Reports';
 import LeaveRecords from '@/pages/LeaveRecords';
 import LicPolicies from '@/pages/LicPolicies';
 import Settings from '@/pages/Settings';
+import VacancyRegister from '@/pages/VacancyRegister';
 
 export default function App() {
   return (
@@ -31,6 +32,7 @@ export default function App() {
             <Route path="/staff/new" element={<StaffForm />} />
             <Route path="/staff/:id/edit" element={<StaffForm />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/vacancy-register" element={<VacancyRegister />} />
           </Route>
         </Route>
 

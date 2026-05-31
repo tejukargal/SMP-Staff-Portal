@@ -40,5 +40,15 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create, update, delete: if isAdmin();
     }
+
+    match /sanctionedPosts/{docId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /vacancyEvents/{docId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
   }
 }
