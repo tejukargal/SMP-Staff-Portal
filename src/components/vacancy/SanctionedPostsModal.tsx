@@ -36,8 +36,7 @@ export function SanctionedPostsModal({ dept, onClose, onSaved }: Props) {
     try {
       const promises = DESIGNATIONS.map((d) => {
         const count = counts[d] ?? 0;
-        if (count > 0) return upsertSanctionedPost(dept, d, count);
-        return Promise.resolve();
+        return upsertSanctionedPost(dept, d, count);
       });
       await Promise.all(promises);
       showToast('success', 'Sanctioned posts saved');

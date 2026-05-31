@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, FileText, CalendarDays, ShieldCheck, Settings, ChevronLeft, ChevronRight, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, CalendarDays, ShieldCheck, Settings, ChevronLeft, ClipboardList } from 'lucide-react';
 import { useRole } from '@/hooks/useRole';
 
 interface SidebarProps {
@@ -19,6 +20,7 @@ const NAV = [
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const { isAdmin } = useRole();
+  const [logoHovered, setLogoHovered] = useState(false);
 
   function navClass(isActive: boolean) {
     const base = 'relative group flex items-center rounded-xl text-[13px] font-medium transition-all duration-150 overflow-hidden';
@@ -47,34 +49,71 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       }}
     >
       {/* Brand */}
-      <div className={`flex items-center pt-5 pb-3 ${collapsed ? 'flex-col gap-2 px-0' : 'px-4 justify-between'}`}>
-        <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`}>
+      <button
+        onClick={onToggle}
+        onMouseEnter={() => setLogoHovered(true)}
+        onMouseLeave={() => setLogoHovered(false)}
+        title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        className={`group flex items-center w-full cursor-pointer hover:bg-sky-50/50 transition-colors pt-5 pb-3 ${
+          collapsed ? 'justify-center px-0' : 'px-4 justify-between gap-3'
+        }`}
+      >
+        {/* Flip-card logo — front: SMP text, back: expand chevron */}
+        <div className="relative w-9 h-9 shrink-0" style={{ perspective: '280px' }}>
           <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-md"
-            style={{ background: 'linear-gradient(135deg, #38BDF8 0%, #0284C7 100%)' }}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              transformStyle: 'preserve-3d',
+              transition: 'transform 380ms cubic-bezier(0.4, 0, 0.2, 1)',
+              transform: collapsed && logoHovered ? 'rotateY(180deg)' : 'rotateY(0deg)',
+            }}
           >
-            <span className="text-white font-bold text-sm" style={{ fontFamily: "'DM Serif Display', serif" }}>
-              SMP
-            </span>
-          </div>
-          {!collapsed && (
-            <div className="min-w-0">
-              <p className="text-sm font-bold text-gray-900 leading-tight tracking-tight">Sanjay Memorial</p>
-              <p className="text-[10px] font-semibold text-sky-500 leading-tight tracking-wider uppercase">Staff Portal</p>
+            {/* Front face: SMP text */}
+            <div
+              className="absolute inset-0 rounded-xl flex items-center justify-center shadow-md"
+              style={{
+                background: 'linear-gradient(135deg, #38BDF8 0%, #0284C7 100%)',
+                backfaceVisibility: 'hidden',
+                WebkitBackfaceVisibility: 'hidden',
+              }}
+            >
+              <span className="text-white font-bold text-sm" style={{ fontFamily: "'DM Serif Display', serif" }}>
+                SMP
+              </span>
             </div>
-          )}
+            {/* Back face: expand arrow */}
+            <div
+              className="absolute inset-0 rounded-xl flex items-center justify-center shadow-md"
+              style={{
+                background: 'linear-gradient(135deg, #0284C7 0%, #0369A1 100%)',
+                backfaceVisibility: 'hidden',
+                WebkitBackfaceVisibility: 'hidden',
+                transform: 'rotateY(180deg)',
+              }}
+            >
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+            </div>
+          </div>
         </div>
 
-        <button
-          onClick={onToggle}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className={`flex items-center justify-center rounded-lg text-gray-400 hover:text-sky-700 hover:bg-sky-50 transition-colors ${
-            collapsed ? 'w-8 h-8' : 'w-7 h-7 shrink-0'
-          }`}
-        >
-          {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
-        </button>
-      </div>
+        {/* Wordmark — expanded only */}
+        {!collapsed && (
+          <div className="min-w-0 flex-1 text-left">
+            <p className="text-sm font-bold text-gray-900 leading-tight tracking-tight">Sanjay Memorial</p>
+            <p className="text-[10px] font-semibold text-sky-500 leading-tight tracking-wider uppercase">Staff Portal</p>
+          </div>
+        )}
+
+        {/* Collapse arrow — expanded only */}
+        {!collapsed && (
+          <span className="flex items-center justify-center text-gray-400 group-hover:text-sky-600 transition-colors shrink-0">
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </span>
+        )}
+      </button>
 
       {/* Divider */}
       <div className="mx-3 h-px bg-sky-100 mb-2" />

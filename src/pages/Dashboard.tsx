@@ -1,11 +1,16 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, GraduationCap, Briefcase, UserCheck, Plus, DollarSign, FileText, Search, Eye } from 'lucide-react';
+import {
+  Users, GraduationCap, Briefcase, UserCheck,
+  Plus, DollarSign, FileText, Search, Eye,
+  Building2, AlertCircle, CheckCircle2,
+} from 'lucide-react';
 import { useStaff } from '@/hooks/useStaff';
+import { getSanctionedPosts } from '@/firebase/firestore';
 import { PageSpinner } from '@/components/ui/Spinner';
 import { DeptBadge } from '@/components/ui/Badge';
 import { DEPARTMENTS, DEPT_COLORS, STATUSES } from '@/constants/enums';
-import type { DeptEnum, StatusEnum, StaffRecord } from '@/types';
+import type { DeptEnum, StatusEnum, StaffRecord, SanctionedPost } from '@/types';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -29,67 +34,186 @@ const STATUS_COLORS: Record<StatusEnum, string> = {
   'DECEASED':    '#475569',
 };
 
-// ── Card ─────────────────────────────────────────────────────────────────────
+// ── Flat Stat Card ────────────────────────────────────────────────────────────
 
 interface StatCardProps {
   label: string;
   value: number;
   sub?: string;
   icon: React.ElementType;
-  gradientFrom: string;
-  gradientTo: string;
+  bg: string;
+  iconBg: string;
+  iconColor: string;
+  numColor: string;
+  borderColor: string;
   delay: number;
 }
 
-function StatCard({ label, value, sub, icon: Icon, gradientFrom, gradientTo, delay }: StatCardProps) {
+function StatCard({ label, value, sub, icon: Icon, bg, iconBg, iconColor, numColor, borderColor, delay }: StatCardProps) {
   return (
     <div
-      className="relative overflow-hidden rounded-2xl p-5 flex flex-col gap-3"
+      className="rounded-2xl p-4 flex items-center gap-4"
       style={{
-        background: `linear-gradient(135deg, ${gradientFrom} 0%, ${gradientTo} 100%)`,
+        background: bg,
+        border: `1.5px solid ${borderColor}`,
         animation: `content-enter 0.35s ease-out ${delay}ms both`,
-        boxShadow: '0 4px 16px rgba(0,0,0,0.08)',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
       }}
     >
-      {/* Background icon watermark */}
-      <div className="absolute right-3 bottom-2 opacity-10">
-        <Icon style={{ width: 64, height: 64 }} />
-      </div>
-
       <div
-        className="w-9 h-9 rounded-xl flex items-center justify-center"
-        style={{ background: 'rgba(255,255,255,0.25)' }}
+        className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
+        style={{ background: iconBg }}
       >
-        <Icon className="w-4.5 h-4.5 text-white" style={{ width: 18, height: 18 }} />
+        <Icon style={{ width: 20, height: 20, color: iconColor }} />
       </div>
-
-      <div>
-        <p className="text-2xl font-bold text-white leading-none">
+      <div className="min-w-0">
+        <p className="text-2xl font-bold leading-none" style={{ color: numColor }}>
           <AnimNum value={value} />
         </p>
-        <p className="text-xs text-white/80 mt-1 font-medium">{label}</p>
-        {sub && <p className="text-[10px] text-white/60 mt-0.5">{sub}</p>}
+        <p className="text-xs font-semibold text-gray-600 mt-1">{label}</p>
+        {sub && <p className="text-[10px] text-gray-400 mt-0.5">{sub}</p>}
       </div>
+    </div>
+  );
+}
+
+// ── Dept theme map (mirrors the StatCard light-tint style) ───────────────────
+
+const DEPT_THEME: Record<DeptEnum, { bg: string; border: string; iconBg: string; numColor: string }> = {
+  CE:      { bg: '#EFF6FF', border: '#BFDBFE', iconBg: '#DBEAFE', numColor: '#1D4ED8' },
+  ME:      { bg: '#ECFDF5', border: '#A7F3D0', iconBg: '#D1FAE5', numColor: '#065F46' },
+  EC:      { bg: '#F5F3FF', border: '#DDD6FE', iconBg: '#EDE9FE', numColor: '#5B21B6' },
+  CS:      { bg: '#FFFBEB', border: '#FDE68A', iconBg: '#FEF3C7', numColor: '#92400E' },
+  EE:      { bg: '#FEF2F2', border: '#FECACA', iconBg: '#FEE2E2', numColor: '#991B1B' },
+  OFFICE:  { bg: '#F9FAFB', border: '#E5E7EB', iconBg: '#F3F4F6', numColor: '#374151' },
+  SCIENCE: { bg: '#ECFEFF', border: '#A5F3FC', iconBg: '#CFFAFE', numColor: '#164E63' },
+};
+
+// ── Dept Vacancy Card ─────────────────────────────────────────────────────────
+
+interface DeptVacancyCardProps {
+  dept: DeptEnum;
+  sanctioned: number;
+  inService: number;
+  vacant: number;
+  delay: number;
+}
+
+function DeptVacancyCard({ dept, sanctioned, inService, vacant, delay }: DeptVacancyCardProps) {
+  const color = DEPT_COLORS[dept];
+  const theme = DEPT_THEME[dept];
+  const hasVacancy = vacant > 0;
+
+  return (
+    <div
+      className="rounded-2xl p-4 flex flex-col gap-3"
+      style={{
+        background: theme.bg,
+        border: `1.5px solid ${theme.border}`,
+        animation: `content-enter 0.35s ease-out ${delay}ms both`,
+        boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+      }}
+    >
+      {/* Dept label */}
+      <div className="flex items-center gap-2">
+        <div
+          className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+          style={{ background: theme.iconBg }}
+        >
+          <Building2 style={{ width: 14, height: 14, color }} />
+        </div>
+        <span className="text-sm font-bold" style={{ color: theme.numColor }}>{dept}</span>
+      </div>
+
+      {/* 3 stats — horizontal, no wrapping */}
+      <div className="flex items-stretch gap-2">
+        <div className="flex-1 flex flex-col gap-1 items-center">
+          <span className="text-xl font-bold tabular-nums leading-none text-gray-800">
+            {sanctioned || '—'}
+          </span>
+          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">Sanctioned</span>
+        </div>
+        <div className="w-px bg-gray-200/70 self-stretch" />
+        <div className="flex-1 flex flex-col gap-1 items-center">
+          <span className="text-xl font-bold tabular-nums leading-none" style={{ color: '#059669' }}>
+            {inService || '—'}
+          </span>
+          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">In Service</span>
+        </div>
+        <div className="w-px bg-gray-200/70 self-stretch" />
+        <div className="flex-1 flex flex-col gap-1 items-center">
+          <span
+            className="text-xl font-bold tabular-nums leading-none"
+            style={{ color: sanctioned === 0 ? '#d1d5db' : hasVacancy ? '#dc2626' : '#22c55e' }}
+          >
+            {sanctioned === 0 ? '—' : vacant}
+          </span>
+          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">Vacant</span>
+        </div>
+      </div>
+
+      {/* Fill bar */}
+      {sanctioned > 0 && (
+        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: theme.border }}>
+          <div
+            className="h-full rounded-full"
+            style={{
+              width: `${Math.min(100, (inService / sanctioned) * 100)}%`,
+              backgroundColor: hasVacancy ? color : '#22c55e',
+              transition: 'width 0.6s ease',
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }
 
 // ── Panel wrapper ─────────────────────────────────────────────────────────────
 
-function Panel({ title, children, delay, className = '' }: {
-  title: string; children: React.ReactNode; delay: number; className?: string;
+function Panel({ title, subtitle, children, delay, action, className = '' }: {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+  delay: number;
+  action?: React.ReactNode;
+  className?: string;
 }) {
   return (
     <div
-      className={`bg-white/80 rounded-2xl border border-sky-100 p-5 flex flex-col gap-4 ${className}`}
+      className={`bg-white rounded-2xl border border-gray-100 p-5 flex flex-col gap-4 ${className}`}
       style={{
         animation: `content-enter 0.35s ease-out ${delay}ms both`,
-        boxShadow: '0 1px 4px rgba(14,165,233,0.07)',
+        boxShadow: '0 1px 6px rgba(0,0,0,0.05)',
       }}
     >
-      <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest">{title}</h2>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-sm font-bold text-gray-800">{title}</h2>
+          {subtitle && <p className="text-[10px] text-gray-400 mt-0.5">{subtitle}</p>}
+        </div>
+        {action}
+      </div>
       {children}
     </div>
+  );
+}
+
+// ── Table helpers ─────────────────────────────────────────────────────────────
+
+function Th({ children, align = 'left', className = '' }: { children?: React.ReactNode; align?: 'left' | 'center' | 'right'; className?: string }) {
+  return (
+    <th className={`px-3 py-2.5 text-[10px] font-bold uppercase tracking-wider text-gray-500 bg-gray-50 text-${align} whitespace-nowrap ${className}`}>
+      {children}
+    </th>
+  );
+}
+
+function Td({ children, align = 'left', className = '' }: { children?: React.ReactNode; align?: 'left' | 'center' | 'right'; className?: string }) {
+  return (
+    <td className={`px-3 py-2 text-sm text-${align} ${className}`}>
+      {children}
+    </td>
   );
 }
 
@@ -105,8 +229,8 @@ function DeptBar({ dept, teaching, nonTeaching, max, delay }: {
 
   return (
     <div className="flex items-center gap-3 group">
-      <span className="w-14 text-[11px] font-semibold text-gray-500 text-right shrink-0">{dept}</span>
-      <div className="flex-1 h-6 bg-sky-50 rounded-lg overflow-hidden flex">
+      <span className="w-14 text-[11px] font-bold text-gray-500 text-right shrink-0">{dept}</span>
+      <div className="flex-1 h-5 bg-gray-100 rounded-lg overflow-hidden flex">
         <div
           className="h-full rounded-l-lg"
           style={{
@@ -143,11 +267,24 @@ function DeptBar({ dept, teaching, nonTeaching, max, delay }: {
   );
 }
 
+// ── Num cell helper ───────────────────────────────────────────────────────────
+
+function Num({ v, color }: { v: number; color?: string }) {
+  if (!v) return <span className="text-gray-200 font-medium">—</span>;
+  return <span className="font-bold tabular-nums" style={{ color: color ?? '#1f2937' }}>{v}</span>;
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
   const { staff, loading } = useStaff();
   const navigate = useNavigate();
+
+  // Sanctioned posts
+  const [sanctionedPosts, setSanctionedPosts] = useState<SanctionedPost[]>([]);
+  useEffect(() => {
+    getSanctionedPosts().then(setSanctionedPosts).catch(() => {});
+  }, []);
 
   // ── Search ─────────────────────────────────────────────────────────────────
   const [searchQ, setSearchQ] = useState('');
@@ -221,6 +358,22 @@ export default function Dashboard() {
   );
 
   const maxInService = Math.max(...deptStats.map(d => d.inService), 1);
+
+  // ── Dept vacancy stats (sanctioned vs in-service) ──────────────────────────
+  const deptVacancyStats = useMemo(() =>
+    DEPARTMENTS.map(dept => {
+      const sanctioned = sanctionedPosts
+        .filter(p => p.dept === dept)
+        .reduce((sum, p) => sum + p.sanctionedCount, 0);
+      const inService = staff.filter(s => s.dept === dept && s.status === 'IN SERVICE').length;
+      const vacant = Math.max(0, sanctioned - inService);
+      return { dept: dept as DeptEnum, sanctioned, inService, vacant };
+    }),
+    [sanctionedPosts, staff]
+  );
+
+  const totalSanctioned = deptVacancyStats.reduce((s, d) => s + d.sanctioned, 0);
+  const totalVacant     = deptVacancyStats.reduce((s, d) => s + d.vacant, 0);
 
   // ── Status breakdown ───────────────────────────────────────────────────────
   const statusCounts = useMemo(() => {
@@ -318,10 +471,10 @@ export default function Dashboard() {
       {/* ── Staff search ─────────────────────────────────────────────────── */}
       <div ref={searchRef} className="relative">
         <div
-          className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl border border-sky-100 bg-white/80"
-          style={{ backdropFilter: 'blur(8px)', boxShadow: '0 1px 6px rgba(14,165,233,0.08)' }}
+          className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl border border-gray-200 bg-white"
+          style={{ boxShadow: '0 1px 4px rgba(0,0,0,0.04)' }}
         >
-          <Search className="w-4 h-4 text-sky-400 shrink-0" />
+          <Search className="w-4 h-4 text-gray-400 shrink-0" />
           <input
             type="text"
             value={searchQ}
@@ -338,10 +491,9 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Suggestions dropdown */}
         {searchOpen && suggestions.length > 0 && (
           <div
-            className="absolute top-full left-0 right-0 mt-1.5 rounded-xl border border-sky-100 bg-white shadow-xl overflow-hidden z-40"
+            className="absolute top-full left-0 right-0 mt-1.5 rounded-xl border border-gray-100 bg-white shadow-xl overflow-hidden z-40"
             style={{ animation: 'modal-enter 0.12s ease-out' }}
           >
             {suggestions.map((s, i) => (
@@ -349,7 +501,7 @@ export default function Dashboard() {
                 key={s.id}
                 onMouseDown={() => { navigate(`/staff/${s.id}`, { state: { from: 'dashboard' } }); setSearchOpen(false); setSearchQ(''); }}
                 onContextMenu={e => openSearchCtx(e, s)}
-                className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-sky-50 transition-colors border-b border-sky-50 last:border-0 select-none"
+                className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-sky-50 transition-colors border-b border-gray-50 last:border-0 select-none"
                 style={{ animation: `content-enter 0.18s ease-out ${i * 40}ms both` }}
               >
                 <div
@@ -370,7 +522,7 @@ export default function Dashboard() {
 
         {searchOpen && searchQ.trim() && suggestions.length === 0 && (
           <div
-            className="absolute top-full left-0 right-0 mt-1.5 rounded-xl border border-sky-100 bg-white shadow-xl px-4 py-3 z-40 text-sm text-gray-400"
+            className="absolute top-full left-0 right-0 mt-1.5 rounded-xl border border-gray-100 bg-white shadow-xl px-4 py-3 z-40 text-sm text-gray-400"
             style={{ animation: 'modal-enter 0.12s ease-out' }}
           >
             No staff found matching "{searchQ.trim()}"
@@ -378,32 +530,35 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Context menu for search result */}
+      {/* Context menu */}
       {searchCtx && (
         <div
           onMouseDown={e => e.stopPropagation()}
-          className="fixed z-50 min-w-36 rounded-lg border border-[#E2E5EA] bg-white shadow-xl py-1 text-sm"
+          className="fixed z-50 min-w-36 rounded-lg border border-gray-200 bg-white shadow-xl py-1 text-sm"
           style={{ top: searchCtx.y, left: searchCtx.x, animation: 'modal-enter 0.12s ease-out' }}
         >
           <button
             onMouseDown={() => { navigate(`/staff/${searchCtx.record.id}`, { state: { from: 'dashboard' } }); setSearchCtx(null); setSearchOpen(false); setSearchQ(''); }}
-            className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-[#374151] hover:bg-[#F7F8FA] transition-colors"
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-gray-700 hover:bg-gray-50 transition-colors"
           >
-            <Eye className="w-3.5 h-3.5 text-[#6B7280]" />
+            <Eye className="w-3.5 h-3.5 text-gray-400" />
             View Profile
           </button>
         </div>
       )}
 
-      {/* ── Row 1: Stat cards ────────────────────────────────────────────── */}
+      {/* ── Row 1: Flat stat cards ───────────────────────────────────────── */}
       <div className="grid grid-cols-4 gap-4">
         <StatCard
           label="Total Staff"
           value={stats.total}
           sub="All statuses"
           icon={Users}
-          gradientFrom="#0284C7"
-          gradientTo="#0369A1"
+          bg="#F0F9FF"
+          iconBg="#BAE6FD"
+          iconColor="#0284C7"
+          numColor="#0369A1"
+          borderColor="#BAE6FD"
           delay={0}
         />
         <StatCard
@@ -411,8 +566,11 @@ export default function Dashboard() {
           value={stats.inService}
           sub={`${stats.total ? Math.round((stats.inService / stats.total) * 100) : 0}% of total`}
           icon={UserCheck}
-          gradientFrom="#059669"
-          gradientTo="#047857"
+          bg="#F0FDF4"
+          iconBg="#BBF7D0"
+          iconColor="#059669"
+          numColor="#047857"
+          borderColor="#BBF7D0"
           delay={60}
         />
         <StatCard
@@ -420,8 +578,11 @@ export default function Dashboard() {
           value={stats.teaching}
           sub="In-service faculty"
           icon={GraduationCap}
-          gradientFrom="#7C3AED"
-          gradientTo="#6D28D9"
+          bg="#F5F3FF"
+          iconBg="#DDD6FE"
+          iconColor="#7C3AED"
+          numColor="#6D28D9"
+          borderColor="#DDD6FE"
           delay={120}
         />
         <StatCard
@@ -429,28 +590,103 @@ export default function Dashboard() {
           value={stats.nonTeaching}
           sub="In-service staff"
           icon={Briefcase}
-          gradientFrom="#D97706"
-          gradientTo="#B45309"
+          bg="#FFFBEB"
+          iconBg="#FDE68A"
+          iconColor="#D97706"
+          numColor="#B45309"
+          borderColor="#FDE68A"
           delay={180}
         />
       </div>
 
-      {/* ── Row 2: Dept chart + Status breakdown ─────────────────────────── */}
+      {/* ── Row 2: Dept Vacancy Cards ────────────────────────────────────── */}
+      <div
+        className="rounded-2xl border border-gray-100 p-4 flex flex-col gap-3"
+        style={{
+          background: '#fff',
+          animation: 'content-enter 0.35s ease-out 200ms both',
+          boxShadow: '0 1px 6px rgba(0,0,0,0.05)',
+        }}
+      >
+        {/* Section header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-bold text-gray-800">Department-wise Vacancy</h2>
+            <p className="text-[10px] text-gray-400 mt-0.5">Sanctioned posts vs in-service headcount</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-gray-800" />
+              <span className="text-[10px] font-semibold text-gray-500">Sanctioned <span className="font-bold text-gray-800">{totalSanctioned}</span></span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span className="text-[10px] font-semibold text-gray-500">In Service <span className="font-bold text-emerald-700">{stats.inService}</span></span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-red-500" />
+              <span className="text-[10px] font-semibold text-gray-500">Vacant <span className="font-bold text-red-600">{totalVacant}</span></span>
+            </div>
+          </div>
+        </div>
+
+        {/* 7 dept cards — 4 + 3 across two rows */}
+        <div className="grid grid-cols-4 gap-3">
+          {deptVacancyStats.map(({ dept, sanctioned, inService, vacant }, i) => (
+            <DeptVacancyCard
+              key={dept}
+              dept={dept}
+              sanctioned={sanctioned}
+              inService={inService}
+              vacant={vacant}
+              delay={220 + i * 40}
+            />
+          ))}
+        </div>
+
+        {/* Summary badges */}
+        {totalSanctioned > 0 && (
+          <div className="flex items-center gap-2 pt-1">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-100">
+              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+              <span className="text-[10px] font-semibold text-emerald-700">
+                {Math.round((stats.inService / totalSanctioned) * 100)}% posts filled
+              </span>
+            </div>
+            {totalVacant > 0 && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 border border-red-100">
+                <AlertCircle className="w-3 h-3 text-red-500" />
+                <span className="text-[10px] font-semibold text-red-600">
+                  {totalVacant} {totalVacant === 1 ? 'vacancy' : 'vacancies'} across departments
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Row 3: Dept chart + Status + Quick actions ───────────────────── */}
       <div className="grid grid-cols-3 gap-4">
 
         {/* Stacked dept bar chart */}
-        <Panel title="Department-wise Staff  ·  In Service" delay={220} className="col-span-2">
-          {/* Legend */}
-          <div className="flex items-center gap-4 -mt-2">
-            <div className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#0EA5E9' }} />
-              <span className="text-[10px] text-gray-400 font-medium">Teaching</span>
+        <Panel
+          title="Department-wise Staff"
+          subtitle="In-service headcount by teaching type"
+          delay={320}
+          className="col-span-2"
+          action={
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-sm bg-sky-400" />
+                <span className="text-[10px] text-gray-400 font-medium">Teaching</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-sm bg-sky-200" />
+                <span className="text-[10px] text-gray-400 font-medium">Non-Teaching</span>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#0EA5E9', opacity: 0.35 }} />
-              <span className="text-[10px] text-gray-400 font-medium">Non-Teaching</span>
-            </div>
-          </div>
+          }
+        >
           <div className="flex flex-col gap-2">
             {deptStats.map(({ dept, teaching, nonTeaching }, i) => (
               <DeptBar
@@ -459,22 +695,22 @@ export default function Dashboard() {
                 teaching={teaching}
                 nonTeaching={nonTeaching}
                 max={maxInService}
-                delay={260 + i * 70}
+                delay={360 + i * 70}
               />
             ))}
           </div>
         </Panel>
 
-        {/* Status breakdown */}
-        <Panel title="Staff Status" delay={240}>
-          <div className="flex flex-col gap-3">
+        {/* Status breakdown + Quick actions */}
+        <Panel title="Staff Status" subtitle="By current status" delay={340}>
+          <div className="flex flex-col gap-2.5">
             {statusCounts.map(({ status, count }) => (
               <div key={status} className="flex flex-col gap-1">
                 <div className="flex justify-between items-center">
-                  <span className="text-xs text-gray-600 font-medium">{status}</span>
+                  <span className="text-xs font-semibold text-gray-600">{status}</span>
                   <span className="text-xs font-bold text-gray-800 tabular-nums">{count}</span>
                 </div>
-                <div className="h-1.5 bg-sky-50 rounded-full overflow-hidden">
+                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full"
                     style={{
@@ -489,20 +725,20 @@ export default function Dashboard() {
             ))}
           </div>
 
-          {/* Quick actions */}
-          <div className="mt-auto pt-3 border-t border-sky-50 flex flex-col gap-1.5">
+          <div className="mt-auto pt-3 border-t border-gray-100 flex flex-col gap-1.5">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Quick Actions</p>
             {[
-              { label: 'Add Staff',        icon: Plus,      to: '/staff/new', color: '#0284C7' },
-              { label: 'Salary Bill',       icon: DollarSign,to: '/salary',   color: '#059669' },
-              { label: 'Reports',           icon: FileText,  to: '/reports',  color: '#7C3AED' },
-            ].map(({ label, icon: Icon, to, color }) => (
+              { label: 'Add Staff',   icon: Plus,       to: '/staff/new', color: '#0284C7', bg: '#F0F9FF' },
+              { label: 'Salary Bill', icon: DollarSign, to: '/salary',    color: '#059669', bg: '#F0FDF4' },
+              { label: 'Reports',     icon: FileText,   to: '/reports',   color: '#7C3AED', bg: '#F5F3FF' },
+            ].map(({ label, icon: Icon, to, color, bg }) => (
               <button
                 key={to}
                 onClick={() => navigate(to)}
-                className="flex items-center gap-2.5 px-3 py-2 rounded-xl border border-sky-100 bg-white/60 hover:bg-sky-50 hover:border-sky-200 transition-all duration-150 text-xs font-medium text-gray-600 hover:text-gray-900 group w-full text-left"
+                className="flex items-center gap-2.5 px-3 py-2 rounded-xl border border-gray-100 hover:border-gray-200 transition-all duration-150 text-xs font-semibold text-gray-700 hover:text-gray-900 group w-full text-left"
+                style={{ background: bg }}
               >
-                <Icon className="w-3.5 h-3.5 shrink-0 transition-transform duration-150 group-hover:scale-110" style={{ color }} />
+                <Icon className="w-3.5 h-3.5 shrink-0" style={{ color }} />
                 {label}
               </button>
             ))}
@@ -511,15 +747,18 @@ export default function Dashboard() {
 
       </div>
 
-      {/* ── Row 3: Dept stats table ───────────────────────────────────────── */}
-      <Panel title="Department Summary" delay={400}>
-        <div className="overflow-x-auto -mx-5 px-5">
+      {/* ── Row 4: Dept Summary table ─────────────────────────────────────── */}
+      <Panel title="Department Summary" subtitle="All statuses combined" delay={480}>
+        <div className="overflow-x-auto -mx-5 -mb-5">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-sky-100">
-                {['Department', 'Total Staff', 'In Service', 'Teaching', 'Non-Teaching', 'Retired / Others'].map(h => (
-                  <th key={h} className="pb-2 text-left font-semibold text-gray-400 uppercase tracking-wide text-[10px] pr-6 last:pr-0 whitespace-nowrap">{h}</th>
-                ))}
+              <tr>
+                <Th className="pl-5 rounded-tl-xl">Department</Th>
+                <Th align="center">Total Staff</Th>
+                <Th align="center">In Service</Th>
+                <Th align="center" className="text-violet-600">Teaching</Th>
+                <Th align="center" className="text-amber-600">Non-Teaching</Th>
+                <Th align="center" className="pr-5 rounded-tr-xl">Retired / Others</Th>
               </tr>
             </thead>
             <tbody>
@@ -528,71 +767,58 @@ export default function Dashboard() {
                 return (
                   <tr
                     key={dept}
-                    className="border-b border-sky-50 last:border-0 hover:bg-sky-50/50 transition-colors"
-                    style={{ animation: `content-enter 0.3s ease-out ${420 + i * 40}ms both` }}
+                    className="border-t border-gray-50 hover:bg-sky-50/40 transition-colors"
+                    style={{ animation: `content-enter 0.3s ease-out ${500 + i * 40}ms both` }}
                   >
-                    <td className="py-1.5 pr-6">
-                      <DeptBadge dept={dept} />
-                    </td>
-                    <td className="py-1.5 pr-6">
-                      <span className="font-bold text-gray-800 tabular-nums">{total}</span>
-                    </td>
-                    <td className="py-1.5 pr-6">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-gray-800 tabular-nums w-6">{inService}</span>
+                    <Td className="pl-5"><DeptBadge dept={dept} /></Td>
+                    <Td align="center"><span className="font-bold text-gray-800 tabular-nums">{total}</span></Td>
+                    <Td align="center">
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="font-bold text-gray-800 tabular-nums w-6 text-right">{inService}</span>
                         {total > 0 && (
-                          <div className="flex-1 max-w-20 h-1.5 bg-sky-50 rounded-full overflow-hidden">
+                          <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                             <div
                               className="h-full rounded-full"
-                              style={{
-                                width: `${(inService / total) * 100}%`,
-                                backgroundColor: DEPT_COLORS[dept],
-                                opacity: 0.7,
-                              }}
+                              style={{ width: `${(inService / total) * 100}%`, backgroundColor: DEPT_COLORS[dept] }}
                             />
                           </div>
                         )}
                       </div>
-                    </td>
-                    <td className="py-1.5 pr-6">
-                      <span className="font-bold text-violet-600 tabular-nums">{teaching}</span>
-                    </td>
-                    <td className="py-1.5 pr-6">
-                      <span className="font-bold text-amber-600 tabular-nums">{nonTeaching}</span>
-                    </td>
-                    <td className="py-1.5">
-                      <span className={`tabular-nums font-bold ${others > 0 ? 'text-gray-500' : 'text-gray-200'}`}>{others}</span>
-                    </td>
+                    </Td>
+                    <Td align="center"><span className="font-bold text-violet-600 tabular-nums">{teaching || '—'}</span></Td>
+                    <Td align="center"><span className="font-bold text-amber-600 tabular-nums">{nonTeaching || '—'}</span></Td>
+                    <Td align="center" className="pr-5">
+                      <span className={`tabular-nums font-bold ${others > 0 ? 'text-gray-500' : 'text-gray-200'}`}>{others || '—'}</span>
+                    </Td>
                   </tr>
                 );
               })}
-              {/* Totals row */}
-              <tr className="border-t-2 border-sky-100 bg-sky-50/40">
-                <td className="py-1.5 pr-6 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total</td>
-                <td className="py-1.5 pr-6 font-bold text-sky-700 tabular-nums">{stats.total}</td>
-                <td className="py-1.5 pr-6 font-bold text-sky-700 tabular-nums">{stats.inService}</td>
-                <td className="py-1.5 pr-6 font-bold text-violet-600 tabular-nums">{stats.teaching}</td>
-                <td className="py-1.5 pr-6 font-bold text-amber-600 tabular-nums">{stats.nonTeaching}</td>
-                <td className="py-1.5 font-bold text-gray-500 tabular-nums">{stats.total - stats.inService}</td>
+              <tr className="border-t-2 border-sky-100 bg-sky-50/60">
+                <td className="pl-5 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total</td>
+                <td className="py-2.5 text-center font-bold text-sky-700 tabular-nums text-sm">{stats.total}</td>
+                <td className="py-2.5 text-center font-bold text-sky-700 tabular-nums text-sm">{stats.inService}</td>
+                <td className="py-2.5 text-center font-bold text-violet-600 tabular-nums text-sm">{stats.teaching}</td>
+                <td className="py-2.5 text-center font-bold text-amber-600 tabular-nums text-sm">{stats.nonTeaching}</td>
+                <td className="pr-5 py-2.5 text-center font-bold text-gray-500 tabular-nums text-sm">{stats.total - stats.inService}</td>
               </tr>
             </tbody>
           </table>
         </div>
       </Panel>
 
-      {/* ── Row 4: Designation + Category-wise table ─────────────────────── */}
+      {/* ── Row 5: Designation + Dept × Category ─────────────────────────── */}
       <div className="grid grid-cols-3 gap-4">
 
         {/* Designation breakdown */}
-        <Panel title="By Designation  ·  In Service" delay={500} className="h-full">
+        <Panel title="By Designation" subtitle="In-service only" delay={560} className="h-full">
           {designationBreakdown.length === 0
             ? <p className="text-sm text-gray-300">No data yet</p>
             : (
-              <div className="flex-1 flex flex-col justify-between">
+              <div className="flex flex-col gap-2.5">
                 {designationBreakdown.map(([desig, count]) => (
                   <div key={desig} className="flex items-center gap-2.5">
-                    <span className="text-sm font-medium text-gray-700 flex-1 truncate" title={desig}>{desig}</span>
-                    <div className="w-20 h-1.5 bg-sky-50 rounded-full overflow-hidden shrink-0">
+                    <span className="text-xs font-semibold text-gray-700 flex-1 truncate" title={desig}>{desig}</span>
+                    <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden shrink-0">
                       <div
                         className="h-full rounded-full bg-sky-400"
                         style={{
@@ -602,61 +828,55 @@ export default function Dashboard() {
                         }}
                       />
                     </div>
-                    <span className="text-sm font-bold text-gray-800 tabular-nums w-5 text-right shrink-0">{count}</span>
+                    <span className="text-xs font-bold text-gray-800 tabular-nums w-5 text-right shrink-0">{count}</span>
                   </div>
                 ))}
               </div>
             )}
         </Panel>
 
-        {/* Category-wise table */}
-        <Panel title="Department × Category  ·  All Staff" delay={520} className="col-span-2">
-          <div className="overflow-x-auto -mx-5 px-5">
+        {/* Dept × category table */}
+        <Panel title="Department × Category" subtitle="All staff · Teaching vs Non-Teaching" delay={580} className="col-span-2">
+          <div className="overflow-x-auto -mx-5 -mb-5">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-sky-100">
-                  <th className="pb-2 text-left font-semibold text-gray-400 uppercase tracking-wide text-[10px] pr-4 whitespace-nowrap">Dept</th>
-                  <th colSpan={3} className="pb-1 text-center font-bold text-[10px] uppercase tracking-wide pr-4" style={{ color: '#7C3AED' }}>Teaching</th>
-                  <th colSpan={3} className="pb-1 text-center font-bold text-[10px] uppercase tracking-wide pr-4" style={{ color: '#D97706' }}>Non-Teaching</th>
-                  <th className="pb-2 text-right font-semibold text-gray-400 uppercase tracking-wide text-[10px] whitespace-nowrap">Total</th>
-                </tr>
-                <tr className="border-b border-sky-200">
-                  <th className="py-1.5 pr-4" />
-                  <th className="py-1.5 text-center text-[10px] font-semibold text-gray-500 pr-2 whitespace-nowrap align-middle">InSvc</th>
-                  <th className="py-1.5 text-center text-[10px] font-semibold text-gray-500 pr-2 whitespace-nowrap align-middle">Others</th>
-                  <th className="py-1.5 text-center text-[10px] font-semibold pr-4 whitespace-nowrap align-middle" style={{ color: '#7C3AED' }}>Sub</th>
-                  <th className="py-1.5 text-center text-[10px] font-semibold text-gray-500 pr-2 whitespace-nowrap align-middle">InSvc</th>
-                  <th className="py-1.5 text-center text-[10px] font-semibold text-gray-500 pr-2 whitespace-nowrap align-middle">Others</th>
-                  <th className="py-1.5 text-center text-[10px] font-semibold pr-4 whitespace-nowrap align-middle" style={{ color: '#D97706' }}>Sub</th>
-                  <th className="py-1.5" />
+                <tr>
+                  <Th className="pl-5">Dept</Th>
+                  <Th align="center" className="text-violet-500">T · InSvc</Th>
+                  <Th align="center" className="text-violet-300">T · Others</Th>
+                  <Th align="center" className="text-violet-700">T · Sub</Th>
+                  <Th align="center" className="text-amber-500">NT · InSvc</Th>
+                  <Th align="center" className="text-amber-300">NT · Others</Th>
+                  <Th align="center" className="text-amber-700">NT · Sub</Th>
+                  <Th align="right" className="pr-5">Total</Th>
                 </tr>
               </thead>
               <tbody>
                 {categoryStats.map(({ dept, tInSvc, tOthers, tTotal, ntInSvc, ntOthers, ntTotal, total }, i) => (
                   <tr
                     key={dept}
-                    className="border-b border-sky-200 last:border-0 hover:bg-sky-50/50 transition-colors"
-                    style={{ animation: `content-enter 0.3s ease-out ${540 + i * 40}ms both` }}
+                    className="border-t border-gray-50 hover:bg-sky-50/40 transition-colors"
+                    style={{ animation: `content-enter 0.3s ease-out ${600 + i * 40}ms both` }}
                   >
-                    <td className="py-1.5 pr-4"><DeptBadge dept={dept} /></td>
-                    <td className="py-1.5 pr-2 text-center tabular-nums font-medium text-gray-700">{tInSvc  || <span className="text-gray-200">—</span>}</td>
-                    <td className="py-1.5 pr-2 text-center tabular-nums font-medium text-gray-500">{tOthers || <span className="text-gray-200">—</span>}</td>
-                    <td className="py-1.5 pr-4 text-center tabular-nums font-bold" style={{ color: '#7C3AED' }}>{tTotal  || <span className="text-gray-200">—</span>}</td>
-                    <td className="py-1.5 pr-2 text-center tabular-nums font-medium text-gray-700">{ntInSvc  || <span className="text-gray-200">—</span>}</td>
-                    <td className="py-1.5 pr-2 text-center tabular-nums font-medium text-gray-500">{ntOthers || <span className="text-gray-200">—</span>}</td>
-                    <td className="py-1.5 pr-4 text-center tabular-nums font-bold" style={{ color: '#D97706' }}>{ntTotal || <span className="text-gray-200">—</span>}</td>
-                    <td className="py-1.5 text-right tabular-nums font-bold text-gray-800">{total || <span className="text-gray-300">—</span>}</td>
+                    <Td className="pl-5"><DeptBadge dept={dept} /></Td>
+                    <Td align="center"><Num v={tInSvc}   color="#7C3AED" /></Td>
+                    <Td align="center"><Num v={tOthers}  color="#a78bfa" /></Td>
+                    <Td align="center"><Num v={tTotal}   color="#6D28D9" /></Td>
+                    <Td align="center"><Num v={ntInSvc}  color="#D97706" /></Td>
+                    <Td align="center"><Num v={ntOthers} color="#fbbf24" /></Td>
+                    <Td align="center"><Num v={ntTotal}  color="#B45309" /></Td>
+                    <Td align="right" className="pr-5"><Num v={total} /></Td>
                   </tr>
                 ))}
-                <tr className="border-t-2 border-sky-100 bg-sky-50/40">
-                  <td className="py-1.5 pr-4 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total</td>
-                  <td className="py-1.5 pr-2 text-center font-bold text-gray-700 tabular-nums">{categoryTotals.tInSvc}</td>
-                  <td className="py-1.5 pr-2 text-center font-bold text-gray-500 tabular-nums">{categoryTotals.tOthers}</td>
-                  <td className="py-1.5 pr-4 text-center font-bold tabular-nums" style={{ color: '#7C3AED' }}>{categoryTotals.tTotal}</td>
-                  <td className="py-1.5 pr-2 text-center font-bold text-gray-700 tabular-nums">{categoryTotals.ntInSvc}</td>
-                  <td className="py-1.5 pr-2 text-center font-bold text-gray-500 tabular-nums">{categoryTotals.ntOthers}</td>
-                  <td className="py-1.5 pr-4 text-center font-bold tabular-nums" style={{ color: '#D97706' }}>{categoryTotals.ntTotal}</td>
-                  <td className="py-1.5 text-right font-bold text-sky-700 tabular-nums">{categoryTotals.total}</td>
+                <tr className="border-t-2 border-sky-100 bg-sky-50/60">
+                  <td className="pl-5 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total</td>
+                  <td className="py-2.5 text-center font-bold text-violet-600 tabular-nums text-sm">{categoryTotals.tInSvc}</td>
+                  <td className="py-2.5 text-center font-bold text-violet-400 tabular-nums text-sm">{categoryTotals.tOthers}</td>
+                  <td className="py-2.5 text-center font-bold text-violet-700 tabular-nums text-sm">{categoryTotals.tTotal}</td>
+                  <td className="py-2.5 text-center font-bold text-amber-600 tabular-nums text-sm">{categoryTotals.ntInSvc}</td>
+                  <td className="py-2.5 text-center font-bold text-amber-400 tabular-nums text-sm">{categoryTotals.ntOthers}</td>
+                  <td className="py-2.5 text-center font-bold text-amber-700 tabular-nums text-sm">{categoryTotals.ntTotal}</td>
+                  <td className="pr-5 py-2.5 text-right font-bold text-sky-700 tabular-nums text-sm">{categoryTotals.total}</td>
                 </tr>
               </tbody>
             </table>
@@ -665,60 +885,54 @@ export default function Dashboard() {
 
       </div>
 
-      {/* ── Row 5: Category-wise table ───────────────────────────────────── */}
-      <Panel title="Category-wise Staff Count  ·  All Staff" delay={580}>
-        <div className="overflow-x-auto -mx-5 px-5">
+      {/* ── Row 6: Category-wise table ───────────────────────────────────── */}
+      <Panel title="Category-wise Staff Count" subtitle="All staff · Teaching vs Non-Teaching" delay={640}>
+        <div className="overflow-x-auto -mx-5 -mb-5">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-sky-100">
-                <th className="pb-2 text-left font-semibold text-gray-400 uppercase tracking-wide text-[10px] pr-6 whitespace-nowrap">Category</th>
-                <th colSpan={3} className="pb-1 text-center font-bold text-[10px] uppercase tracking-wide pr-6" style={{ color: '#7C3AED' }}>Teaching</th>
-                <th colSpan={3} className="pb-1 text-center font-bold text-[10px] uppercase tracking-wide pr-6" style={{ color: '#D97706' }}>Non-Teaching</th>
-                <th className="pb-2 text-right font-semibold text-sky-600 uppercase tracking-wide text-[10px] whitespace-nowrap">Total</th>
-              </tr>
-              <tr className="border-b border-sky-200">
-                <th className="py-1.5 pr-6" />
-                <th className="py-1.5 text-center text-[10px] font-semibold text-gray-500 pr-3 whitespace-nowrap align-middle">In Service</th>
-                <th className="py-1.5 text-center text-[10px] font-semibold text-gray-500 pr-3 whitespace-nowrap align-middle">Others</th>
-                <th className="py-1.5 text-center text-[10px] font-semibold pr-6 whitespace-nowrap align-middle" style={{ color: '#7C3AED' }}>Sub-total</th>
-                <th className="py-1.5 text-center text-[10px] font-semibold text-gray-500 pr-3 whitespace-nowrap align-middle">In Service</th>
-                <th className="py-1.5 text-center text-[10px] font-semibold text-gray-500 pr-3 whitespace-nowrap align-middle">Others</th>
-                <th className="py-1.5 text-center text-[10px] font-semibold pr-6 whitespace-nowrap align-middle" style={{ color: '#D97706' }}>Sub-total</th>
-                <th className="py-1.5" />
+              <tr>
+                <Th className="pl-5">Category</Th>
+                <Th align="center" className="text-violet-500">T · In Svc</Th>
+                <Th align="center" className="text-violet-300">T · Others</Th>
+                <Th align="center" className="text-violet-700">T · Sub</Th>
+                <Th align="center" className="text-amber-500">NT · In Svc</Th>
+                <Th align="center" className="text-amber-300">NT · Others</Th>
+                <Th align="center" className="text-amber-700">NT · Sub</Th>
+                <Th align="right" className="pr-5">Total</Th>
               </tr>
             </thead>
             <tbody>
               {catRows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-6 text-center text-sm text-gray-300">No category data recorded yet</td>
+                  <td colSpan={8} className="py-8 text-center text-sm text-gray-300">No category data recorded yet</td>
                 </tr>
               ) : catRows.map(({ cat, tInSvc, tOthers, tTotal, ntInSvc, ntOthers, ntTotal, total }, i) => (
                 <tr
                   key={cat}
-                  className="border-b border-sky-200 last:border-0 hover:bg-sky-50/50 transition-colors"
-                  style={{ animation: `content-enter 0.3s ease-out ${600 + i * 40}ms both` }}
+                  className="border-t border-gray-50 hover:bg-sky-50/40 transition-colors"
+                  style={{ animation: `content-enter 0.3s ease-out ${660 + i * 40}ms both` }}
                 >
-                  <td className="py-1.5 pr-6">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-50 text-sky-700 border border-sky-100 whitespace-nowrap">{cat}</span>
-                  </td>
-                  <td className="py-1.5 pr-3 text-center tabular-nums font-medium text-gray-700">{tInSvc   || <span className="text-gray-200">—</span>}</td>
-                  <td className="py-1.5 pr-3 text-center tabular-nums font-medium text-gray-500">{tOthers  || <span className="text-gray-200">—</span>}</td>
-                  <td className="py-1.5 pr-6 text-center tabular-nums font-bold" style={{ color: '#7C3AED' }}>{tTotal   || <span className="text-gray-200">—</span>}</td>
-                  <td className="py-1.5 pr-3 text-center tabular-nums font-medium text-gray-700">{ntInSvc  || <span className="text-gray-200">—</span>}</td>
-                  <td className="py-1.5 pr-3 text-center tabular-nums font-medium text-gray-500">{ntOthers || <span className="text-gray-200">—</span>}</td>
-                  <td className="py-1.5 pr-6 text-center tabular-nums font-bold" style={{ color: '#D97706' }}>{ntTotal  || <span className="text-gray-200">—</span>}</td>
-                  <td className="py-1.5 text-right tabular-nums font-bold text-gray-800">{total || <span className="text-gray-300">—</span>}</td>
+                  <Td className="pl-5">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-50 text-sky-700 border border-sky-100">{cat}</span>
+                  </Td>
+                  <Td align="center"><Num v={tInSvc}   color="#7C3AED" /></Td>
+                  <Td align="center"><Num v={tOthers}  color="#a78bfa" /></Td>
+                  <Td align="center"><Num v={tTotal}   color="#6D28D9" /></Td>
+                  <Td align="center"><Num v={ntInSvc}  color="#D97706" /></Td>
+                  <Td align="center"><Num v={ntOthers} color="#fbbf24" /></Td>
+                  <Td align="center"><Num v={ntTotal}  color="#B45309" /></Td>
+                  <Td align="right" className="pr-5"><Num v={total} /></Td>
                 </tr>
               ))}
-              <tr className="border-t-2 border-sky-100 bg-sky-50/40">
-                <td className="py-1.5 pr-6 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Total</td>
-                <td className="py-1.5 pr-3 text-center font-bold text-gray-700 tabular-nums">{catTotals.tInSvc}</td>
-                <td className="py-1.5 pr-3 text-center font-bold text-gray-500 tabular-nums">{catTotals.tOthers}</td>
-                <td className="py-1.5 pr-6 text-center font-bold tabular-nums" style={{ color: '#7C3AED' }}>{catTotals.tTotal}</td>
-                <td className="py-1.5 pr-3 text-center font-bold text-gray-700 tabular-nums">{catTotals.ntInSvc}</td>
-                <td className="py-1.5 pr-3 text-center font-bold text-gray-500 tabular-nums">{catTotals.ntOthers}</td>
-                <td className="py-1.5 pr-6 text-center font-bold tabular-nums" style={{ color: '#D97706' }}>{catTotals.ntTotal}</td>
-                <td className="py-1.5 text-right font-bold text-sky-700 tabular-nums">{catTotals.total}</td>
+              <tr className="border-t-2 border-sky-100 bg-sky-50/60">
+                <td className="pl-5 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total</td>
+                <td className="py-2.5 text-center font-bold text-violet-600 tabular-nums text-sm">{catTotals.tInSvc}</td>
+                <td className="py-2.5 text-center font-bold text-violet-400 tabular-nums text-sm">{catTotals.tOthers}</td>
+                <td className="py-2.5 text-center font-bold text-violet-700 tabular-nums text-sm">{catTotals.tTotal}</td>
+                <td className="py-2.5 text-center font-bold text-amber-600 tabular-nums text-sm">{catTotals.ntInSvc}</td>
+                <td className="py-2.5 text-center font-bold text-amber-400 tabular-nums text-sm">{catTotals.ntOthers}</td>
+                <td className="py-2.5 text-center font-bold text-amber-700 tabular-nums text-sm">{catTotals.ntTotal}</td>
+                <td className="pr-5 py-2.5 text-right font-bold text-sky-700 tabular-nums text-sm">{catTotals.total}</td>
               </tr>
             </tbody>
           </table>

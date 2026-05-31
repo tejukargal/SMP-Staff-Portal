@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { VacancyConfirmModal } from '@/components/vacancy/VacancyConfirmModal';
@@ -12,6 +12,84 @@ import { computeDOR, getAge } from '@/utils/dateUtils';
 import { DESIGNATIONS, DEPARTMENTS, STATUSES } from '@/constants/enums';
 import type { StaffRecord, DesignationEnum, DeptEnum, StatusEnum, StaffType, AppointmentType } from '@/types';
 import { PageSpinner } from '@/components/ui/Spinner';
+
+// ── Date helpers ──────────────────────────────────────────────────────────────
+
+/** "dd/mm/yyyy" → "yyyy-MM-dd" (returns '' if invalid) */
+function parseDMY(s: string): string {
+  const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return '';
+  const [, d, mo, y] = m;
+  const dt = new Date(+y, +mo - 1, +d);
+  if (
+    isNaN(dt.getTime()) ||
+    dt.getDate() !== +d ||
+    dt.getMonth() !== +mo - 1 ||
+    dt.getFullYear() !== +y
+  ) return '';
+  return `${y}-${mo}-${d}`;
+}
+
+/** "yyyy-MM-dd" → "dd/mm/yyyy" (returns '' if not ISO) */
+function isoToDMY(iso: string): string {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return '';
+  const [y, mo, d] = iso.split('-');
+  return `${d}/${mo}/${y}`;
+}
+
+interface DateInputProps {
+  label: string;
+  required?: boolean;
+  value: string;         // ISO yyyy-MM-dd (or '')
+  onChange: (iso: string) => void;
+  error?: string;
+  hint?: string;
+}
+
+function DateInput({ label, required, value, onChange, error, hint }: DateInputProps) {
+  const [text, setText] = useState(() => isoToDMY(value));
+  // Track the last ISO we emitted so we can distinguish external vs internal changes
+  const lastEmitted = useRef(value);
+
+  useLayoutEffect(() => {
+    // Sync display only when the prop changed externally (e.g. DOR auto-computed from DOB)
+    if (value !== lastEmitted.current && value) {
+      lastEmitted.current = value;
+      setText(isoToDMY(value));
+    }
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newText = e.target.value;
+    setText(newText);
+
+    const iso = parseDMY(newText);
+    lastEmitted.current = iso;
+    onChange(iso);
+  };
+
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-xs font-medium text-[#374151] uppercase tracking-wide">
+        {label}{required && <span className="text-[#DC2626] ml-1">*</span>}
+      </label>
+      <input
+        type="text"
+        placeholder="dd/mm/yyyy"
+        value={text}
+        onChange={handleChange}
+        maxLength={10}
+        className={[
+          'w-full px-3 py-2 text-sm rounded-lg border bg-white text-gray-900',
+          'placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:border-transparent',
+          error ? 'border-red-400' : 'border-gray-200',
+        ].join(' ')}
+      />
+      {hint && !error && <p className="text-xs text-[#6B7280]">{hint}</p>}
+      {error && <p className="text-xs text-[#DC2626]">{error}</p>}
+    </div>
+  );
+}
 
 type FormErrors = Partial<Record<keyof StaffRecord, string>>;
 
@@ -325,12 +403,11 @@ export default function StaffForm() {
 
       {/* B — Personal Details */}
       <ColorSection title="B — Personal Details" color="sky">
-        <Input
+        <DateInput
           label="Date of Birth"
-          type="date"
           required
           value={form.dob ?? ''}
-          onChange={(e) => set('dob', e.target.value)}
+          onChange={(iso) => set('dob', iso)}
           error={errors.dob}
         />
         <Input
@@ -368,11 +445,10 @@ export default function StaffForm() {
 
       {/* C — Educational Qualifications */}
       <ColorSection title="C — Educational Qualifications" color="emerald">
-        <Input
+        <DateInput
           label="Date of Completion"
-          type="date"
           value={form.dateOfCompletion ?? ''}
-          onChange={(e) => set('dateOfCompletion', e.target.value)}
+          onChange={(iso) => set('dateOfCompletion', iso)}
         />
         <Select
           label="Class Obtained"
@@ -393,19 +469,17 @@ export default function StaffForm() {
 
       {/* D — Service Details */}
       <ColorSection title="D — Service Details" color="amber">
-        <Input
+        <DateInput
           label="Date of Entry into Service"
-          type="date"
           required
           value={form.doe ?? ''}
-          onChange={(e) => set('doe', e.target.value)}
+          onChange={(iso) => set('doe', iso)}
           error={errors.doe}
         />
-        <Input
+        <DateInput
           label="Date of Retirement (DOR)"
-          type="date"
           value={form.dor ?? ''}
-          onChange={(e) => set('dor', e.target.value)}
+          onChange={(iso) => set('dor', iso)}
           hint="Auto-computed from DOB"
         />
         <Input
@@ -414,11 +488,10 @@ export default function StaffForm() {
           value={form.approvalOrderNumber ?? ''}
           onChange={(e) => set('approvalOrderNumber', e.target.value)}
         />
-        <Input
+        <DateInput
           label="Date of Approval"
-          type="date"
           value={form.dateOfApproval ?? ''}
-          onChange={(e) => set('dateOfApproval', e.target.value)}
+          onChange={(iso) => set('dateOfApproval', iso)}
         />
         <div className="lg:col-span-2">
           <Input

@@ -91,8 +91,8 @@ export function StaffTable({ staff, loading, isAdmin, onDelete, onLeave, onLic, 
               >
                 <Td className="font-mono text-xs text-[#6B7280] w-10">{startIndex + i}</Td>
                 <Td><span className="font-medium">{s.name}</span></Td>
-                <Td className="font-mono text-xs">{s.empId}</Td>
-                <Td className="text-xs">{s.designation}</Td>
+                <Td className="font-mono text-xs font-bold">{s.empId}</Td>
+                <Td className="text-xs font-bold">{s.designation}</Td>
                 <Td className="text-xs text-[#6B7280]">{s.type}</Td>
                 <Td><DeptBadge dept={s.dept} /></Td>
                 <Td><StatusBadge status={s.status} /></Td>
