@@ -4,7 +4,7 @@ import { Eye, Pencil, Trash2, CalendarDays, ShieldCheck } from 'lucide-react';
 import { Table, Thead, Th, Tr, Td } from '@/components/ui/Table';
 import { DeptBadge, StatusBadge } from '@/components/ui/Badge';
 import { SkeletonRow } from '@/components/ui/Spinner';
-import { formatDate } from '@/utils/dateUtils';
+import { formatDate, computeDOR } from '@/utils/dateUtils';
 import type { StaffRecord } from '@/types';
 
 interface Props {
@@ -70,15 +70,16 @@ export function StaffTable({ staff, loading, isAdmin, onDelete, onLeave, onLic, 
             <Th>Dept</Th>
             <Th>Status</Th>
             <Th className="text-center">DOE</Th>
+            <Th className="text-center">DOR</Th>
           </tr>
         </Thead>
         <tbody>
           {loading
-            ? Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} cols={8} />)
+            ? Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} cols={9} />)
             : staff.length === 0
             ? (
               <tr>
-                <td colSpan={8} className="px-3 py-12 text-center text-sm text-[#6B7280]">
+                <td colSpan={9} className="px-3 py-12 text-center text-sm text-[#6B7280]">
                   No staff records found
                 </td>
               </tr>
@@ -97,6 +98,7 @@ export function StaffTable({ staff, loading, isAdmin, onDelete, onLeave, onLic, 
                 <Td><DeptBadge dept={s.dept} /></Td>
                 <Td><StatusBadge status={s.status} /></Td>
                 <Td className="text-xs text-[#6B7280] text-center">{formatDate(s.doe)}</Td>
+                <Td className="text-xs text-[#6B7280] text-center">{formatDate(computeDOR(s.dob) || s.dor)}</Td>
               </Tr>
             ))}
         </tbody>

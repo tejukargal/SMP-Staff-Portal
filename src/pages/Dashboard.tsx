@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Users, GraduationCap, Briefcase, UserCheck,
   Plus, DollarSign, FileText, Search, Eye,
-  Building2, AlertCircle, CheckCircle2,
+  Building2,
 } from 'lucide-react';
 import { useStaff } from '@/hooks/useStaff';
 import { getSanctionedPosts } from '@/firebase/firestore';
@@ -106,7 +106,7 @@ function DeptVacancyCard({ dept, sanctioned, inService, vacant, delay }: DeptVac
 
   return (
     <div
-      className="rounded-2xl p-4 flex flex-col gap-3"
+      className="flex-1 min-w-0 rounded-xl px-2 py-2 flex flex-col gap-1.5"
       style={{
         background: theme.bg,
         border: `1.5px solid ${theme.border}`,
@@ -115,46 +115,46 @@ function DeptVacancyCard({ dept, sanctioned, inService, vacant, delay }: DeptVac
       }}
     >
       {/* Dept label */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         <div
-          className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+          className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
           style={{ background: theme.iconBg }}
         >
-          <Building2 style={{ width: 14, height: 14, color }} />
+          <Building2 style={{ width: 10, height: 10, color }} />
         </div>
-        <span className="text-sm font-bold" style={{ color: theme.numColor }}>{dept}</span>
+        <span className="text-xs font-bold leading-none" style={{ color: theme.numColor }}>{dept}</span>
       </div>
 
       {/* 3 stats — horizontal, no wrapping */}
-      <div className="flex items-stretch gap-2">
-        <div className="flex-1 flex flex-col gap-1 items-center">
-          <span className="text-xl font-bold tabular-nums leading-none text-gray-800">
+      <div className="flex items-stretch gap-1">
+        <div className="flex-1 flex flex-col gap-0.5 items-center">
+          <span className="text-sm font-bold tabular-nums leading-none text-gray-800">
             {sanctioned || '—'}
           </span>
-          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">Sanctioned</span>
+          <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">Sanct.</span>
         </div>
         <div className="w-px bg-gray-200/70 self-stretch" />
-        <div className="flex-1 flex flex-col gap-1 items-center">
-          <span className="text-xl font-bold tabular-nums leading-none" style={{ color: '#059669' }}>
+        <div className="flex-1 flex flex-col gap-0.5 items-center">
+          <span className="text-sm font-bold tabular-nums leading-none" style={{ color: '#059669' }}>
             {inService || '—'}
           </span>
-          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">In Service</span>
+          <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">Filled</span>
         </div>
         <div className="w-px bg-gray-200/70 self-stretch" />
-        <div className="flex-1 flex flex-col gap-1 items-center">
+        <div className="flex-1 flex flex-col gap-0.5 items-center">
           <span
-            className="text-xl font-bold tabular-nums leading-none"
+            className="text-sm font-bold tabular-nums leading-none"
             style={{ color: sanctioned === 0 ? '#d1d5db' : hasVacancy ? '#dc2626' : '#22c55e' }}
           >
             {sanctioned === 0 ? '—' : vacant}
           </span>
-          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">Vacant</span>
+          <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">Vacant</span>
         </div>
       </div>
 
       {/* Fill bar */}
       {sanctioned > 0 && (
-        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: theme.border }}>
+        <div className="h-1 rounded-full overflow-hidden" style={{ background: theme.border }}>
           <div
             className="h-full rounded-full"
             style={{
@@ -372,8 +372,6 @@ export default function Dashboard() {
     [sanctionedPosts, staff]
   );
 
-  const totalSanctioned = deptVacancyStats.reduce((s, d) => s + d.sanctioned, 0);
-  const totalVacant     = deptVacancyStats.reduce((s, d) => s + d.vacant, 0);
 
   // ── Status breakdown ───────────────────────────────────────────────────────
   const statusCounts = useMemo(() => {
@@ -600,69 +598,17 @@ export default function Dashboard() {
       </div>
 
       {/* ── Row 2: Dept Vacancy Cards ────────────────────────────────────── */}
-      <div
-        className="rounded-2xl border border-gray-100 p-4 flex flex-col gap-3"
-        style={{
-          background: '#fff',
-          animation: 'content-enter 0.35s ease-out 200ms both',
-          boxShadow: '0 1px 6px rgba(0,0,0,0.05)',
-        }}
-      >
-        {/* Section header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-sm font-bold text-gray-800">Department-wise Vacancy</h2>
-            <p className="text-[10px] text-gray-400 mt-0.5">Sanctioned posts vs in-service headcount</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-gray-800" />
-              <span className="text-[10px] font-semibold text-gray-500">Sanctioned <span className="font-bold text-gray-800">{totalSanctioned}</span></span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              <span className="text-[10px] font-semibold text-gray-500">In Service <span className="font-bold text-emerald-700">{stats.inService}</span></span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-red-500" />
-              <span className="text-[10px] font-semibold text-gray-500">Vacant <span className="font-bold text-red-600">{totalVacant}</span></span>
-            </div>
-          </div>
-        </div>
-
-        {/* 7 dept cards — 4 + 3 across two rows */}
-        <div className="grid grid-cols-4 gap-3">
-          {deptVacancyStats.map(({ dept, sanctioned, inService, vacant }, i) => (
-            <DeptVacancyCard
-              key={dept}
-              dept={dept}
-              sanctioned={sanctioned}
-              inService={inService}
-              vacant={vacant}
-              delay={220 + i * 40}
-            />
-          ))}
-        </div>
-
-        {/* Summary badges */}
-        {totalSanctioned > 0 && (
-          <div className="flex items-center gap-2 pt-1">
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-100">
-              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-              <span className="text-[10px] font-semibold text-emerald-700">
-                {Math.round((stats.inService / totalSanctioned) * 100)}% posts filled
-              </span>
-            </div>
-            {totalVacant > 0 && (
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-50 border border-red-100">
-                <AlertCircle className="w-3 h-3 text-red-500" />
-                <span className="text-[10px] font-semibold text-red-600">
-                  {totalVacant} {totalVacant === 1 ? 'vacancy' : 'vacancies'} across departments
-                </span>
-              </div>
-            )}
-          </div>
-        )}
+      <div className="flex gap-2">
+        {deptVacancyStats.map(({ dept, sanctioned, inService, vacant }, i) => (
+          <DeptVacancyCard
+            key={dept}
+            dept={dept}
+            sanctioned={sanctioned}
+            inService={inService}
+            vacant={vacant}
+            delay={220 + i * 40}
+          />
+        ))}
       </div>
 
       {/* ── Row 3: Dept chart + Status + Quick actions ───────────────────── */}
@@ -687,7 +633,7 @@ export default function Dashboard() {
             </div>
           }
         >
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col flex-1 justify-between">
             {deptStats.map(({ dept, teaching, nonTeaching }, i) => (
               <DeptBar
                 key={dept}
@@ -814,7 +760,7 @@ export default function Dashboard() {
           {designationBreakdown.length === 0
             ? <p className="text-sm text-gray-300">No data yet</p>
             : (
-              <div className="flex flex-col gap-2.5">
+              <div className="flex flex-col flex-1 justify-between">
                 {designationBreakdown.map(([desig, count]) => (
                   <div key={desig} className="flex items-center gap-2.5">
                     <span className="text-xs font-semibold text-gray-700 flex-1 truncate" title={desig}>{desig}</span>

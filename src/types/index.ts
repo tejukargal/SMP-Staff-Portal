@@ -77,6 +77,7 @@ export type DesignationEnum =
   | 'SYS. ANALIST'
   | 'OPERATOR'
   | 'HOD'
+  | 'LIBRARIAN'
   | 'OTHER';
 
 export type DeptEnum = 'OFFICE' | 'ME' | 'CE' | 'EC' | 'CS' | 'EE' | 'SCIENCE';
@@ -115,6 +116,10 @@ export interface StaffRecord {
   createdBy: string;
   photoUrl?: string;
   remarks?: string;
+  fatherOrHusbandName?: string;
+  address?: string;
+  recipientId?: string;
+  biometricId?: string;
   caste?: string;
   category?: string;
   dateOfCompletion?: string;
@@ -126,6 +131,9 @@ export interface StaffRecord {
   leaveBalance?: LeaveBalance;
   appointmentType?: AppointmentType;
   promotedFromDesignation?: string;
+  dateOfDeceased?: string;
+  dateOfResignation?: string;
+  dateOfTransfer?: string;
 }
 
 export interface LicPolicy {

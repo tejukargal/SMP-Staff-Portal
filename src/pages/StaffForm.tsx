@@ -160,6 +160,8 @@ const EMPTY: Partial<StaffRecord> = {
   dob: '',
   phone: '',
   email: '',
+  fatherOrHusbandName: '',
+  address: '',
   caste: '',
   category: '',
   dateOfCompletion: '',
@@ -173,6 +175,11 @@ const EMPTY: Partial<StaffRecord> = {
   bankAccountNo: '',
   pan: '',
   aadhar: '',
+  recipientId: '',
+  biometricId: '',
+  dateOfDeceased: '',
+  dateOfResignation: '',
+  dateOfTransfer: '',
   remarks: '',
 };
 
@@ -390,6 +397,35 @@ export default function StaffForm() {
           options={statusOptions}
           error={errors.status}
         />
+        {form.status === 'RTRD' && (
+          <DateInput
+            label="Date of Retirement"
+            value={form.dor ?? ''}
+            onChange={(iso) => set('dor', iso)}
+            hint="Actual date of retirement"
+          />
+        )}
+        {form.status === 'DECEASED' && (
+          <DateInput
+            label="Date of Deceased"
+            value={form.dateOfDeceased ?? ''}
+            onChange={(iso) => set('dateOfDeceased', iso)}
+          />
+        )}
+        {form.status === 'RESIGNED' && (
+          <DateInput
+            label="Date of Resignation"
+            value={form.dateOfResignation ?? ''}
+            onChange={(iso) => set('dateOfResignation', iso)}
+          />
+        )}
+        {form.status === 'TRANSFERRED' && (
+          <DateInput
+            label="Date of Transfer"
+            value={form.dateOfTransfer ?? ''}
+            onChange={(iso) => set('dateOfTransfer', iso)}
+          />
+        )}
         <div className="lg:col-span-4">
           <label className="text-xs font-medium text-[#374151] uppercase tracking-wide block mb-1">Remarks</label>
           <textarea
@@ -426,6 +462,22 @@ export default function StaffForm() {
             value={form.email ?? ''}
             onChange={(e) => set('email', e.target.value.toLowerCase())}
             error={errors.email}
+          />
+        </div>
+        <div className="lg:col-span-2">
+          <Input
+            label="Father / Husband Name"
+            uppercase
+            value={form.fatherOrHusbandName ?? ''}
+            onChange={(e) => set('fatherOrHusbandName', e.target.value)}
+          />
+        </div>
+        <div className="lg:col-span-4">
+          <Input
+            label="Address"
+            uppercase
+            value={form.address ?? ''}
+            onChange={(e) => set('address', e.target.value)}
           />
         </div>
         <Input
@@ -553,6 +605,20 @@ export default function StaffForm() {
             className="font-mono"
           />
         </div>
+        <Input
+          label="Recipient ID"
+          uppercase
+          value={form.recipientId ?? ''}
+          onChange={(e) => set('recipientId', e.target.value)}
+          className="font-mono"
+        />
+        <Input
+          label="Biometric ID"
+          uppercase
+          value={form.biometricId ?? ''}
+          onChange={(e) => set('biometricId', e.target.value)}
+          className="font-mono"
+        />
       </ColorSection>
 
       </form>
