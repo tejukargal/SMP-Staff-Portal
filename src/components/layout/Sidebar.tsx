@@ -1,3 +1,4 @@
+import type React from 'react';
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Users, FileText, CalendarDays, ShieldCheck, Settings, ChevronLeft, ClipboardList } from 'lucide-react';
@@ -22,13 +23,29 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const { isAdmin } = useRole();
   const [logoHovered, setLogoHovered] = useState(false);
 
+  // Fades + collapses text width in sync with sidebar animation
+  const textStyle = (extraDelay = 0): React.CSSProperties => ({
+    overflow: 'hidden',
+    whiteSpace: 'nowrap',
+    maxWidth: collapsed ? 0 : '160px',
+    opacity: collapsed ? 0 : 1,
+    transition: collapsed
+      ? `opacity 100ms ease, max-width 220ms cubic-bezier(0.4,0,0.2,1) ${extraDelay}ms`
+      : `max-width 220ms cubic-bezier(0.4,0,0.2,1) ${extraDelay}ms, opacity 180ms ease ${extraDelay + 60}ms`,
+  });
+
+  // paddingLeft transitions: 16px (icon centered in 64px sidebar) → 12px (left-aligned when expanded)
+  const navItemStyle: React.CSSProperties = {
+    paddingLeft: collapsed ? 16 : 12,
+    transition: 'padding-left 220ms cubic-bezier(0.4, 0, 0.2, 1)',
+  };
+
   function navClass(isActive: boolean) {
-    const base = 'relative group flex items-center rounded-xl text-[13px] font-medium transition-all duration-150 overflow-hidden';
-    const layout = collapsed ? 'justify-center px-0 py-2.5 w-10 mx-auto' : 'gap-2.5 px-3 py-2 w-full';
+    const base = 'group flex items-center gap-2.5 pr-3 py-2 w-full rounded-xl text-[13px] font-medium transition-colors duration-150';
     const color = isActive
       ? 'bg-sky-500 text-white shadow-sm'
       : 'text-gray-500 hover:bg-sky-50 hover:text-sky-800';
-    return `${base} ${layout} ${color}`;
+    return `${base} ${color}`;
   }
 
   function iconClass(isActive: boolean) {
@@ -39,9 +56,10 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   return (
     <aside
-      className="no-print sidebar fixed left-0 top-0 bottom-0 flex flex-col z-30"
+      className="no-print sidebar fixed left-0 top-0 bottom-0 flex flex-col z-30 overflow-hidden"
       style={{
         width: collapsed ? 64 : 240,
+        transition: 'width 220ms cubic-bezier(0.4, 0, 0.2, 1)',
         background: 'rgba(255,255,255,0.92)',
         backdropFilter: 'blur(20px)',
         borderRight: '1px solid #BAE6FD',
@@ -54,9 +72,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         onMouseEnter={() => setLogoHovered(true)}
         onMouseLeave={() => setLogoHovered(false)}
         title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        className={`group flex items-center w-full cursor-pointer hover:bg-sky-50/50 transition-colors pt-5 pb-3 ${
-          collapsed ? 'justify-center px-0' : 'px-4 justify-between gap-3'
-        }`}
+        className="group flex items-center gap-2 w-full cursor-pointer hover:bg-sky-50/50 transition-colors pt-5 pb-3 px-4"
       >
         {/* Flip-card logo — front: SMP text, back: expand chevron */}
         <div className="relative w-9 h-9 shrink-0" style={{ perspective: '280px' }}>
@@ -99,27 +115,31 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           </div>
         </div>
 
-        {/* Wordmark — expanded only */}
-        {!collapsed && (
-          <div className="min-w-0 flex-1 text-left">
-            <p className="text-sm font-bold text-gray-900 leading-tight tracking-tight">Sanjay Memorial</p>
-            <p className="text-[10px] font-semibold text-sky-500 leading-tight tracking-wider uppercase">Staff Portal</p>
-          </div>
-        )}
+        {/* Wordmark — opacity only; width follows the sidebar's own transition naturally */}
+        <div
+          className="overflow-hidden"
+          style={{
+            opacity: collapsed ? 0 : 1,
+            transition: collapsed ? 'opacity 100ms ease' : 'opacity 180ms ease 60ms',
+          }}
+        >
+          <p style={{ whiteSpace: 'nowrap' }} className="text-base font-bold text-sky-600 leading-tight tracking-tight">Staff Portal</p>
+        </div>
 
-        {/* Collapse arrow — expanded only */}
-        {!collapsed && (
-          <span className="flex items-center justify-center text-gray-400 group-hover:text-sky-600 transition-colors shrink-0">
-            <ChevronLeft className="w-3.5 h-3.5" />
-          </span>
-        )}
+        {/* Collapse arrow — fades with sidebar */}
+        <span
+          className="flex items-center justify-center text-gray-400 group-hover:text-sky-600 transition-colors shrink-0 ml-auto"
+          style={textStyle()}
+        >
+          <ChevronLeft className="w-3.5 h-3.5" />
+        </span>
       </button>
 
       {/* Divider */}
       <div className="mx-3 h-px bg-sky-100 mb-2" />
 
       {/* Navigation */}
-      <nav className="flex-1 px-2 pb-2 space-y-0.5 overflow-y-auto no-scrollbar">
+      <nav className="flex-1 px-2 pb-2 space-y-0.5 overflow-y-auto overflow-x-hidden no-scrollbar">
         {NAV.map(({ to, label, icon: Icon, adminOnly }) => {
           if (adminOnly && !isAdmin) return null;
           return (
@@ -127,29 +147,21 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
               key={to}
               to={to}
               title={collapsed ? label : undefined}
+              style={navItemStyle}
               className={({ isActive }) => navClass(isActive)}
             >
               {({ isActive }) => (
                 <>
                   <Icon className={iconClass(isActive)} />
-                  {!collapsed && (
-                    <>
-                      <span className="sidebar-content-label flex-1 truncate">{label}</span>
-                      {isActive && (
-                        <span className="w-1 h-4 rounded-full bg-sky-300 glow-sky" />
-                      )}
-                    </>
-                  )}
-                  {collapsed && isActive && (
-                    <span className="absolute right-1.5 top-1/2 -translate-y-1/2 w-1 h-4 rounded-full bg-sky-300 glow-sky" />
-                  )}
-                  {collapsed && (
+                  <span style={textStyle()} className="truncate sidebar-content-label">{label}</span>
+                  {isActive && (
                     <span
-                      className="absolute left-full ml-3 px-2.5 py-1 rounded-md text-xs font-medium bg-gray-900 text-white whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none z-50"
-                      style={{ transition: 'opacity 120ms ease', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}
-                    >
-                      {label}
-                    </span>
+                      className="w-1 h-4 rounded-full bg-sky-300 glow-sky shrink-0"
+                      style={{
+                        opacity: collapsed ? 0 : 1,
+                        transition: 'opacity 150ms ease',
+                      }}
+                    />
                   )}
                 </>
               )}
