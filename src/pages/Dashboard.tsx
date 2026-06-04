@@ -1,16 +1,15 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Users, GraduationCap, Briefcase, UserCheck,
-  Plus, DollarSign, FileText, Search, Eye,
-  Building2,
+  GraduationCap, Briefcase, UserCheck,
+  Search, Eye, ClipboardList, X,
 } from 'lucide-react';
 import { useStaff } from '@/hooks/useStaff';
 import { getSanctionedPosts } from '@/firebase/firestore';
 import { PageSpinner } from '@/components/ui/Spinner';
 import { DeptBadge } from '@/components/ui/Badge';
-import { DEPARTMENTS, DEPT_COLORS, STATUSES } from '@/constants/enums';
-import type { DeptEnum, StatusEnum, StaffRecord, SanctionedPost } from '@/types';
+import { DEPARTMENTS, DESIGNATIONS, DEPT_COLORS } from '@/constants/enums';
+import type { DeptEnum, StaffRecord, SanctionedPost } from '@/types';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -26,13 +25,6 @@ function AnimNum({ value }: { value: number }) {
   );
 }
 
-const STATUS_COLORS: Record<StatusEnum, string> = {
-  'IN SERVICE':  '#22c55e',
-  'RTRD':        '#94a3b8',
-  'TRANSFERRED': '#38bdf8',
-  'RESIGNED':    '#fbbf24',
-  'DECEASED':    '#475569',
-};
 
 // ── Flat Stat Card ────────────────────────────────────────────────────────────
 
@@ -77,97 +69,6 @@ function StatCard({ label, value, sub, icon: Icon, bg, iconBg, iconColor, numCol
   );
 }
 
-// ── Dept theme map (mirrors the StatCard light-tint style) ───────────────────
-
-const DEPT_THEME: Record<DeptEnum, { bg: string; border: string; iconBg: string; numColor: string }> = {
-  CE:      { bg: '#EFF6FF', border: '#BFDBFE', iconBg: '#DBEAFE', numColor: '#1D4ED8' },
-  ME:      { bg: '#ECFDF5', border: '#A7F3D0', iconBg: '#D1FAE5', numColor: '#065F46' },
-  EC:      { bg: '#F5F3FF', border: '#DDD6FE', iconBg: '#EDE9FE', numColor: '#5B21B6' },
-  CS:      { bg: '#FFFBEB', border: '#FDE68A', iconBg: '#FEF3C7', numColor: '#92400E' },
-  EE:      { bg: '#FEF2F2', border: '#FECACA', iconBg: '#FEE2E2', numColor: '#991B1B' },
-  OFFICE:  { bg: '#F9FAFB', border: '#E5E7EB', iconBg: '#F3F4F6', numColor: '#374151' },
-  SCIENCE: { bg: '#ECFEFF', border: '#A5F3FC', iconBg: '#CFFAFE', numColor: '#164E63' },
-};
-
-// ── Dept Vacancy Card ─────────────────────────────────────────────────────────
-
-interface DeptVacancyCardProps {
-  dept: DeptEnum;
-  sanctioned: number;
-  inService: number;
-  vacant: number;
-  delay: number;
-}
-
-function DeptVacancyCard({ dept, sanctioned, inService, vacant, delay }: DeptVacancyCardProps) {
-  const color = DEPT_COLORS[dept];
-  const theme = DEPT_THEME[dept];
-  const hasVacancy = vacant > 0;
-
-  return (
-    <div
-      className="flex-1 min-w-0 rounded-xl px-2 py-2 flex flex-col gap-1.5"
-      style={{
-        background: theme.bg,
-        border: `1.5px solid ${theme.border}`,
-        animation: `content-enter 0.35s ease-out ${delay}ms both`,
-        boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
-      }}
-    >
-      {/* Dept label */}
-      <div className="flex items-center gap-1.5">
-        <div
-          className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
-          style={{ background: theme.iconBg }}
-        >
-          <Building2 style={{ width: 10, height: 10, color }} />
-        </div>
-        <span className="text-xs font-bold leading-none" style={{ color: theme.numColor }}>{dept}</span>
-      </div>
-
-      {/* 3 stats — horizontal, no wrapping */}
-      <div className="flex items-stretch gap-1">
-        <div className="flex-1 flex flex-col gap-0.5 items-center">
-          <span className="text-sm font-bold tabular-nums leading-none text-gray-800">
-            {sanctioned || '—'}
-          </span>
-          <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">Sanct.</span>
-        </div>
-        <div className="w-px bg-gray-200/70 self-stretch" />
-        <div className="flex-1 flex flex-col gap-0.5 items-center">
-          <span className="text-sm font-bold tabular-nums leading-none" style={{ color: '#059669' }}>
-            {inService || '—'}
-          </span>
-          <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">Filled</span>
-        </div>
-        <div className="w-px bg-gray-200/70 self-stretch" />
-        <div className="flex-1 flex flex-col gap-0.5 items-center">
-          <span
-            className="text-sm font-bold tabular-nums leading-none"
-            style={{ color: sanctioned === 0 ? '#d1d5db' : hasVacancy ? '#dc2626' : '#22c55e' }}
-          >
-            {sanctioned === 0 ? '—' : vacant}
-          </span>
-          <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide whitespace-nowrap">Vacant</span>
-        </div>
-      </div>
-
-      {/* Fill bar */}
-      {sanctioned > 0 && (
-        <div className="h-1 rounded-full overflow-hidden" style={{ background: theme.border }}>
-          <div
-            className="h-full rounded-full"
-            style={{
-              width: `${Math.min(100, (inService / sanctioned) * 100)}%`,
-              backgroundColor: hasVacancy ? color : '#22c55e',
-              transition: 'width 0.6s ease',
-            }}
-          />
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ── Panel wrapper ─────────────────────────────────────────────────────────────
 
@@ -217,55 +118,6 @@ function Td({ children, align = 'left', className = '' }: { children?: React.Rea
   );
 }
 
-// ── Stacked bar row ───────────────────────────────────────────────────────────
-
-function DeptBar({ dept, teaching, nonTeaching, max, delay }: {
-  dept: DeptEnum; teaching: number; nonTeaching: number; max: number; delay: number;
-}) {
-  const color = DEPT_COLORS[dept];
-  const total = teaching + nonTeaching;
-  const tPct  = max > 0 ? (teaching   / max) * 100 : 0;
-  const ntPct = max > 0 ? (nonTeaching / max) * 100 : 0;
-
-  return (
-    <div className="flex items-center gap-3 group">
-      <span className="w-14 text-[11px] font-bold text-gray-500 text-right shrink-0">{dept}</span>
-      <div className="flex-1 h-5 bg-gray-100 rounded-lg overflow-hidden flex">
-        <div
-          className="h-full rounded-l-lg"
-          style={{
-            width: `${tPct}%`,
-            backgroundColor: color,
-            animation: `bar-grow 0.55s ease-out ${delay}ms both`,
-            transformOrigin: 'left',
-            minWidth: tPct > 0 ? 4 : 0,
-          }}
-        />
-        <div
-          className="h-full"
-          style={{
-            width: `${ntPct}%`,
-            backgroundColor: color,
-            opacity: 0.35,
-            animation: `bar-grow 0.55s ease-out ${delay + 80}ms both`,
-            transformOrigin: 'left',
-            minWidth: ntPct > 0 ? 4 : 0,
-          }}
-        />
-      </div>
-      <div className="flex items-center gap-1.5 w-28 shrink-0">
-        {total > 0 ? (
-          <>
-            <span className="text-xs font-bold text-gray-800 tabular-nums w-5 text-right">{total}</span>
-            <span className="text-[10px] text-gray-400 tabular-nums">{teaching}T · {nonTeaching}NT</span>
-          </>
-        ) : (
-          <span className="text-[10px] text-gray-300">—</span>
-        )}
-      </div>
-    </div>
-  );
-}
 
 // ── Num cell helper ───────────────────────────────────────────────────────────
 
@@ -341,6 +193,18 @@ export default function Dashboard() {
     };
   }, [staff]);
 
+  const { totalSanctioned, totalFilled, totalVacant } = useMemo(() => {
+    const sanctioned = sanctionedPosts.reduce((s, p) => s + p.sanctionedCount, 0);
+    const inService  = staff.filter(s => s.status === 'IN SERVICE').length;
+    return {
+      totalSanctioned: sanctioned,
+      totalFilled:     inService,
+      totalVacant:     Math.max(0, sanctioned - inService),
+    };
+  }, [sanctionedPosts, staff]);
+
+  const [detailModal, setDetailModal] = useState<'sanctioned' | 'filled' | 'vacant' | null>(null);
+
   // ── Dept × type breakdown (in-service only) ────────────────────────────────
   const deptStats = useMemo(() =>
     DEPARTMENTS.map(dept => {
@@ -357,8 +221,6 @@ export default function Dashboard() {
     [staff]
   );
 
-  const maxInService = Math.max(...deptStats.map(d => d.inService), 1);
-
   // ── Dept vacancy stats (sanctioned vs in-service) ──────────────────────────
   const deptVacancyStats = useMemo(() =>
     DEPARTMENTS.map(dept => {
@@ -373,14 +235,52 @@ export default function Dashboard() {
   );
 
 
-  // ── Status breakdown ───────────────────────────────────────────────────────
-  const statusCounts = useMemo(() => {
-    const map: Partial<Record<StatusEnum, number>> = {};
-    staff.forEach(s => { map[s.status] = (map[s.status] ?? 0) + 1; });
-    return STATUSES.map(s => ({ status: s, count: map[s] ?? 0 })).filter(s => s.count > 0);
-  }, [staff]);
+  // ── Dept × designation vacancy matrix ─────────────────────────────────────
+  const vacancyMatrix = useMemo(() => {
+    const inSvc: Record<string, number> = {};
+    staff.filter(s => s.status === 'IN SERVICE').forEach(s => {
+      const k = `${s.dept}_${s.designation}`;
+      inSvc[k] = (inSvc[k] ?? 0) + 1;
+    });
 
-  const maxStatus = Math.max(...statusCounts.map(s => s.count), 1);
+    function buildRow(desig: string) {
+      const cells = DEPARTMENTS.map(dept => {
+        const sanctioned = sanctionedPosts.find(p => p.dept === dept && p.designation === desig)?.sanctionedCount ?? 0;
+        const filled = inSvc[`${dept}_${desig}`] ?? 0;
+        return { sanctioned, filled, vacant: Math.max(0, sanctioned - filled) };
+      });
+      const totSanctioned = cells.reduce((s, c) => s + c.sanctioned, 0);
+      const totVacant     = cells.reduce((s, c) => s + c.vacant, 0);
+      return { desig, cells, totSanctioned, totVacant };
+    }
+
+    function subtotal(rows: ReturnType<typeof buildRow>[]) {
+      return {
+        cells: DEPARTMENTS.map((_, i) => ({
+          sanctioned: rows.reduce((s, r) => s + r.cells[i].sanctioned, 0),
+          vacant:     rows.reduce((s, r) => s + r.cells[i].vacant, 0),
+        })),
+        totSanctioned: rows.reduce((s, r) => s + r.totSanctioned, 0),
+        totVacant:     rows.reduce((s, r) => s + r.totVacant, 0),
+      };
+    }
+
+    const TEACHING_DESIGS     = ['PRINCIPAL', 'HOD', 'SEL GR LECT', 'LECTURER', 'INSTRUCTOR', 'ASST. INST', 'SYS. ANALIST'];
+    const NON_TEACHING_DESIGS = ['SUPDT.', 'FDC', 'SDC', 'TYPIST', 'GROUP D', 'MECHANIC', 'HELPER', 'OPERATOR', 'LIBRARIAN', 'OTHER'];
+    // Preserve any designation not in either group
+    const OTHER_DESIGS = DESIGNATIONS.filter(d => !TEACHING_DESIGS.includes(d) && !NON_TEACHING_DESIGS.includes(d) && d !== 'SEL GR LECT');
+
+    const teachingRows     = TEACHING_DESIGS.map(buildRow).filter(r => r.totSanctioned > 0);
+    const nonTeachingRows  = NON_TEACHING_DESIGS.map(buildRow).filter(r => r.totSanctioned > 0);
+    const otherRows        = OTHER_DESIGS.map(buildRow).filter(r => r.totSanctioned > 0);
+
+    const teachingSub    = subtotal(teachingRows);
+    const nonTeachingSub = subtotal(nonTeachingRows);
+    const allRows        = [...teachingRows, ...nonTeachingRows, ...otherRows];
+    const grandTotal     = subtotal(allRows);
+
+    return { teachingRows, nonTeachingRows, otherRows, teachingSub, nonTeachingSub, grandTotal };
+  }, [sanctionedPosts, staff]);
 
   // ── Designation breakdown (in-service) ─────────────────────────────────────
   const designationBreakdown = useMemo(() => {
@@ -548,28 +448,16 @@ export default function Dashboard() {
       {/* ── Row 1: Flat stat cards ───────────────────────────────────────── */}
       <div className="grid grid-cols-4 gap-4">
         <StatCard
-          label="Total Staff"
-          value={stats.total}
-          sub="All statuses"
-          icon={Users}
-          bg="#F0F9FF"
-          iconBg="#BAE6FD"
-          iconColor="#0284C7"
-          numColor="#0369A1"
-          borderColor="#BAE6FD"
-          delay={0}
-        />
-        <StatCard
           label="In Service"
           value={stats.inService}
-          sub={`${stats.total ? Math.round((stats.inService / stats.total) * 100) : 0}% of total`}
+          sub={totalSanctioned > 0 ? `of ${totalSanctioned} sanctioned` : 'Active staff'}
           icon={UserCheck}
           bg="#F0FDF4"
           iconBg="#BBF7D0"
           iconColor="#059669"
           numColor="#047857"
           borderColor="#BBF7D0"
-          delay={60}
+          delay={0}
         />
         <StatCard
           label="Teaching"
@@ -581,7 +469,7 @@ export default function Dashboard() {
           iconColor="#7C3AED"
           numColor="#6D28D9"
           borderColor="#DDD6FE"
-          delay={120}
+          delay={60}
         />
         <StatCard
           label="Non-Teaching"
@@ -593,105 +481,250 @@ export default function Dashboard() {
           iconColor="#D97706"
           numColor="#B45309"
           borderColor="#FDE68A"
+          delay={120}
+        />
+        <StatCard
+          label="Vacant Posts"
+          value={totalVacant}
+          sub={totalSanctioned > 0 ? `${totalSanctioned} allotted total` : 'No posts configured'}
+          icon={ClipboardList}
+          bg={totalVacant > 0 ? '#FEF2F2' : '#F0FDF4'}
+          iconBg={totalVacant > 0 ? '#FECACA' : '#BBF7D0'}
+          iconColor={totalVacant > 0 ? '#DC2626' : '#059669'}
+          numColor={totalVacant > 0 ? '#B91C1C' : '#047857'}
+          borderColor={totalVacant > 0 ? '#FECACA' : '#BBF7D0'}
           delay={180}
         />
       </div>
 
-      {/* ── Row 2: Dept Vacancy Cards ────────────────────────────────────── */}
-      <div className="flex gap-2">
-        {deptVacancyStats.map(({ dept, sanctioned, inService, vacant }, i) => (
-          <DeptVacancyCard
-            key={dept}
-            dept={dept}
-            sanctioned={sanctioned}
-            inService={inService}
-            vacant={vacant}
-            delay={220 + i * 40}
-          />
+      {/* ── Row 2: Vacancy summary cards ─────────────────────────────────── */}
+      <div className="grid grid-cols-3 gap-4">
+        {([
+          { key: 'sanctioned', label: 'Sanctioned Posts', value: totalSanctioned,
+            bg: '#F0F9FF', border: '#BAE6FD', num: '#0369A1', sub: 'Total allotted' },
+          { key: 'filled',     label: 'Filled Posts',     value: totalFilled,
+            bg: '#F0FDF4', border: '#BBF7D0', num: '#047857', sub: 'Currently in service' },
+          { key: 'vacant',     label: 'Vacant Posts',     value: totalVacant,
+            bg: totalVacant > 0 ? '#FEF2F2' : '#F0FDF4',
+            border: totalVacant > 0 ? '#FECACA' : '#BBF7D0',
+            num: totalVacant > 0 ? '#B91C1C' : '#047857',
+            sub: totalVacant > 0 ? 'Posts unfilled' : 'All posts filled' },
+        ] as const).map(({ key, label, value, bg, border, num, sub }, i) => (
+          <button
+            key={key}
+            onClick={() => setDetailModal(key)}
+            className="rounded-2xl p-4 text-left w-full group transition-all hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98]"
+            style={{
+              background: bg, border: `1.5px solid ${border}`,
+              animation: `content-enter 0.35s ease-out ${i * 60}ms both`,
+              boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+            }}
+          >
+            <p className="text-3xl font-bold tabular-nums leading-none" style={{ color: num }}>
+              <AnimNum value={value} />
+            </p>
+            <p className="text-xs font-semibold text-gray-600 mt-2">{label}</p>
+            <p className="text-[10px] text-gray-400 mt-0.5 group-hover:text-gray-500 transition-colors">{sub} · view breakdown →</p>
+          </button>
         ))}
       </div>
 
-      {/* ── Row 3: Dept chart + Status + Quick actions ───────────────────── */}
-      <div className="grid grid-cols-3 gap-4">
-
-        {/* Stacked dept bar chart */}
-        <Panel
-          title="Department-wise Staff"
-          subtitle="In-service headcount by teaching type"
-          delay={320}
-          className="col-span-2"
-          action={
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-sm bg-sky-400" />
-                <span className="text-[10px] text-gray-400 font-medium">Teaching</span>
+      {/* ── Vacancy detail modal ──────────────────────────────────────────── */}
+      {detailModal && (() => {
+        const cfg = {
+          sanctioned: { title: 'Sanctioned Posts by Dept', getValue: (d: typeof deptVacancyStats[0]) => d.sanctioned,  total: totalSanctioned, numColor: '#0369A1' },
+          filled:     { title: 'Filled Posts by Dept',     getValue: (d: typeof deptVacancyStats[0]) => d.inService,   total: totalFilled,     numColor: '#047857' },
+          vacant:     { title: 'Vacant Posts by Dept',     getValue: (d: typeof deptVacancyStats[0]) => d.vacant,      total: totalVacant,     numColor: '#B91C1C' },
+        }[detailModal];
+        const rows = deptVacancyStats.filter(d => detailModal === 'vacant' ? d.sanctioned > 0 : cfg.getValue(d) > 0);
+        return (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center"
+            style={{ backgroundColor: 'rgba(0,0,0,0.4)', animation: 'backdrop-enter 0.18s ease-out' }}
+            onClick={() => setDetailModal(null)}
+          >
+            <div
+              className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-xs mx-4"
+              style={{ animation: 'modal-enter 0.22s cubic-bezier(0.34,1.26,0.64,1)' }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                <h3 className="text-sm font-semibold text-gray-900">{cfg.title}</h3>
+                <button onClick={() => setDetailModal(null)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-              <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-sm bg-sky-200" />
-                <span className="text-[10px] text-gray-400 font-medium">Non-Teaching</span>
+              <div className="px-4 py-3">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-gray-400 uppercase tracking-wide">
+                      <th className="pb-1.5 text-left font-medium">Department</th>
+                      <th className="pb-1.5 text-right font-medium">Count</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map(({ dept, ...d }) => {
+                      const val = cfg.getValue({ dept, ...d } as typeof deptVacancyStats[0]);
+                      return (
+                        <tr key={dept} className="border-b border-gray-50">
+                          <td className="py-1.5">
+                            <span className="inline-flex items-center gap-1">
+                              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: DEPT_COLORS[dept] }} />
+                              <span className="font-medium text-gray-700">{dept}</span>
+                            </span>
+                          </td>
+                          <td className="py-1.5 text-right font-bold tabular-nums"
+                            style={{ color: detailModal === 'vacant' && val > 0 ? '#B91C1C' : detailModal === 'vacant' ? '#22c55e' : cfg.numColor }}>
+                            {val}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-gray-100">
+                      <td className="pt-2 font-bold text-gray-700">Total</td>
+                      <td className="pt-2 text-right font-bold tabular-nums text-sm" style={{ color: cfg.numColor }}>{cfg.total}</td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
             </div>
-          }
-        >
-          <div className="flex flex-col flex-1 justify-between">
-            {deptStats.map(({ dept, teaching, nonTeaching }, i) => (
-              <DeptBar
-                key={dept}
-                dept={dept}
-                teaching={teaching}
-                nonTeaching={nonTeaching}
-                max={maxInService}
-                delay={360 + i * 70}
-              />
-            ))}
           </div>
-        </Panel>
+        );
+      })()}
 
-        {/* Status breakdown + Quick actions */}
-        <Panel title="Staff Status" subtitle="By current status" delay={340}>
-          <div className="flex flex-col gap-2.5">
-            {statusCounts.map(({ status, count }) => (
-              <div key={status} className="flex flex-col gap-1">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-semibold text-gray-600">{status}</span>
-                  <span className="text-xs font-bold text-gray-800 tabular-nums">{count}</span>
-                </div>
-                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${(count / maxStatus) * 100}%`,
-                      backgroundColor: STATUS_COLORS[status],
-                      animation: 'bar-grow 0.5s ease-out both',
-                      transformOrigin: 'left',
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+      {/* ── Row 3: Dept × Designation vacancy matrix (full width) ──────────── */}
+      <Panel
+        title="Dept × Designation Vacancy"
+        subtitle="Vacant posts by department and designation"
+        delay={320}
+      >
+        <div className="-mx-5 -mb-5 overflow-x-auto">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-100">
+                <th className="pl-5 pr-3 py-2.5 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide sticky left-0 bg-gray-50 z-10 w-36">Designation</th>
+                {DEPARTMENTS.map(dept => (
+                  <th key={dept} className="px-3 py-2.5 text-center text-[11px] font-bold uppercase tracking-wide"
+                    style={{ color: DEPT_COLORS[dept as DeptEnum] }}>
+                    {dept}
+                  </th>
+                ))}
+                <th className="px-3 py-2.5 pr-5 text-center text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* ── Teaching ── */}
+              {vacancyMatrix.teachingRows.length > 0 && (
+                <tr>
+                  <td colSpan={DEPARTMENTS.length + 2} className="pl-5 pt-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-violet-500">
+                    Teaching
+                  </td>
+                </tr>
+              )}
+              {vacancyMatrix.teachingRows.map(({ desig, cells, totVacant }, i) => (
+                <tr key={desig} className="border-b border-gray-50 hover:bg-sky-50/40 transition-colors"
+                  style={{ animation: `content-enter 0.25s ease-out ${340 + i * 25}ms both` }}>
+                  <td className="pl-5 pr-3 py-2 text-[13px] font-medium text-gray-700 sticky left-0 bg-white">{desig}</td>
+                  {cells.map((c, di) => (
+                    <td key={di} className="px-3 py-2 text-center tabular-nums text-[13px]">
+                      {c.sanctioned === 0
+                        ? <span className="text-gray-200">—</span>
+                        : c.vacant === 0
+                          ? <span className="font-semibold text-green-500">0</span>
+                          : <span className="font-bold text-red-500">{c.vacant}</span>}
+                    </td>
+                  ))}
+                  <td className="px-3 pr-5 py-2 text-center tabular-nums text-[13px] font-bold">
+                    {totVacant > 0 ? <span className="text-red-500">{totVacant}</span> : <span className="text-gray-300">0</span>}
+                  </td>
+                </tr>
+              ))}
+              {vacancyMatrix.teachingRows.length > 0 && (
+                <tr className="border-y border-violet-100 bg-violet-50/60">
+                  <td className="pl-5 pr-3 py-2 text-[11px] font-bold uppercase tracking-wider text-violet-600 sticky left-0 bg-violet-50/60">Teaching Sub.</td>
+                  {vacancyMatrix.teachingSub.cells.map((c, di) => (
+                    <td key={di} className="px-3 py-2 text-center tabular-nums text-xs font-bold">
+                      {c.sanctioned === 0 ? <span className="text-gray-200">—</span>
+                        : c.vacant > 0 ? <span className="text-red-500">{c.vacant}</span>
+                        : <span className="text-gray-300">0</span>}
+                    </td>
+                  ))}
+                  <td className="px-3 pr-5 py-2 text-center text-xs font-bold">
+                    {vacancyMatrix.teachingSub.totVacant > 0
+                      ? <span className="text-red-500">{vacancyMatrix.teachingSub.totVacant}</span>
+                      : <span className="text-gray-300">0</span>}
+                  </td>
+                </tr>
+              )}
 
-          <div className="mt-auto pt-3 border-t border-gray-100 flex flex-col gap-1.5">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Quick Actions</p>
-            {[
-              { label: 'Add Staff',   icon: Plus,       to: '/staff/new', color: '#0284C7', bg: '#F0F9FF' },
-              { label: 'Salary Bill', icon: DollarSign, to: '/salary',    color: '#059669', bg: '#F0FDF4' },
-              { label: 'Reports',     icon: FileText,   to: '/reports',   color: '#7C3AED', bg: '#F5F3FF' },
-            ].map(({ label, icon: Icon, to, color, bg }) => (
-              <button
-                key={to}
-                onClick={() => navigate(to)}
-                className="flex items-center gap-2.5 px-3 py-2 rounded-xl border border-gray-100 hover:border-gray-200 transition-all duration-150 text-xs font-semibold text-gray-700 hover:text-gray-900 group w-full text-left"
-                style={{ background: bg }}
-              >
-                <Icon className="w-3.5 h-3.5 shrink-0" style={{ color }} />
-                {label}
-              </button>
-            ))}
-          </div>
-        </Panel>
+              {/* ── Non-Teaching ── */}
+              {vacancyMatrix.nonTeachingRows.length > 0 && (
+                <tr>
+                  <td colSpan={DEPARTMENTS.length + 2} className="pl-5 pt-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-amber-500">
+                    Non-Teaching
+                  </td>
+                </tr>
+              )}
+              {vacancyMatrix.nonTeachingRows.map(({ desig, cells, totVacant }, i) => (
+                <tr key={desig} className="border-b border-gray-50 hover:bg-sky-50/40 transition-colors"
+                  style={{ animation: `content-enter 0.25s ease-out ${400 + i * 25}ms both` }}>
+                  <td className="pl-5 pr-3 py-2 text-[13px] font-medium text-gray-700 sticky left-0 bg-white">{desig}</td>
+                  {cells.map((c, di) => (
+                    <td key={di} className="px-3 py-2 text-center tabular-nums text-[13px]">
+                      {c.sanctioned === 0
+                        ? <span className="text-gray-200">—</span>
+                        : c.vacant === 0
+                          ? <span className="font-semibold text-green-500">0</span>
+                          : <span className="font-bold text-red-500">{c.vacant}</span>}
+                    </td>
+                  ))}
+                  <td className="px-3 pr-5 py-2 text-center tabular-nums text-[13px] font-bold">
+                    {totVacant > 0 ? <span className="text-red-500">{totVacant}</span> : <span className="text-gray-300">0</span>}
+                  </td>
+                </tr>
+              ))}
+              {vacancyMatrix.nonTeachingRows.length > 0 && (
+                <tr className="border-y border-amber-100 bg-amber-50/60">
+                  <td className="pl-5 pr-3 py-2 text-[11px] font-bold uppercase tracking-wider text-amber-600 sticky left-0 bg-amber-50/60">Non-Teaching Sub.</td>
+                  {vacancyMatrix.nonTeachingSub.cells.map((c, di) => (
+                    <td key={di} className="px-3 py-2 text-center tabular-nums text-xs font-bold">
+                      {c.sanctioned === 0 ? <span className="text-gray-200">—</span>
+                        : c.vacant > 0 ? <span className="text-red-500">{c.vacant}</span>
+                        : <span className="text-gray-300">0</span>}
+                    </td>
+                  ))}
+                  <td className="px-3 pr-5 py-2 text-center text-xs font-bold">
+                    {vacancyMatrix.nonTeachingSub.totVacant > 0
+                      ? <span className="text-red-500">{vacancyMatrix.nonTeachingSub.totVacant}</span>
+                      : <span className="text-gray-300">0</span>}
+                  </td>
+                </tr>
+              )}
 
-      </div>
+              {/* ── Grand total ── */}
+              <tr className="bg-sky-50/70 border-t-2 border-sky-100">
+                <td className="pl-5 pr-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-sky-700 sticky left-0 bg-sky-50/70">Total</td>
+                {vacancyMatrix.grandTotal.cells.map((c, di) => (
+                  <td key={di} className="px-3 py-2.5 text-center tabular-nums font-bold text-sm">
+                    {c.sanctioned === 0
+                      ? <span className="text-gray-200 text-xs">—</span>
+                      : c.vacant > 0
+                        ? <span className="text-red-600">{c.vacant}</span>
+                        : <span className="text-gray-300 text-xs">0</span>}
+                  </td>
+                ))}
+                <td className="px-3 pr-5 py-2.5 text-center font-bold text-sm">
+                  {vacancyMatrix.grandTotal.totVacant > 0
+                    ? <span className="text-red-600">{vacancyMatrix.grandTotal.totVacant}</span>
+                    : <span className="text-green-600">0</span>}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </Panel>
 
       {/* ── Row 4: Dept Summary table ─────────────────────────────────────── */}
       <Panel title="Department Summary" subtitle="All statuses combined" delay={480}>

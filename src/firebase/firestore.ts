@@ -221,7 +221,19 @@ function sanctionedFromDoc(snap: QueryDocumentSnapshot<DocumentData>): Sanctione
 
 export async function getSanctionedPosts(): Promise<SanctionedPost[]> {
   const snap = await getDocs(collection(db, 'sanctionedPosts'));
-  return snap.docs.map(sanctionedFromDoc);
+  const all = snap.docs.map(sanctionedFromDoc);
+
+  // Deduplicate by dept+designation — keep the entry with the highest count
+  // (handles old docs created with different ID formats)
+  const seen = new Map<string, SanctionedPost>();
+  for (const p of all) {
+    const key = `${p.dept}_${p.designation}`;
+    const existing = seen.get(key);
+    if (!existing || p.sanctionedCount > existing.sanctionedCount) {
+      seen.set(key, p);
+    }
+  }
+  return Array.from(seen.values());
 }
 
 export async function upsertSanctionedPost(
@@ -236,6 +248,10 @@ export async function upsertSanctionedPost(
     sanctionedCount,
     updatedAt: serverTimestamp(),
   });
+}
+
+export async function deleteSanctionedPost(dept: string, designation: string): Promise<void> {
+  await deleteDoc(doc(db, 'sanctionedPosts', `${dept}_${designation}`));
 }
 
 // ── Vacancy Events ─────────────────────────────────────────────────────

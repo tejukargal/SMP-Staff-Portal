@@ -26,8 +26,9 @@ export const DEPARTMENTS: DeptEnum[] = [
   'CE',
   'EC',
   'CS',
-  'EE',
   'SCIENCE',
+  'ELECTRICAL',
+  'EE',
 ];
 
 export const STATUSES: StatusEnum[] = [
@@ -46,6 +47,7 @@ export const DEPT_COLORS: Record<DeptEnum, string> = {
   EE: '#EF4444',
   OFFICE: '#6B7280',
   SCIENCE: '#06B6D4',
+  ELECTRICAL: '#F97316',
 };
 
 export const STATUS_STYLES: Record<StatusEnum, { bg: string; text: string }> = {

@@ -46,7 +46,7 @@ export function Header({ sidebarWidth }: HeaderProps) {
 
   return (
     <header
-      className="no-print fixed top-0 right-0 flex items-center px-6 z-20"
+      className="no-print fixed top-0 right-0 flex items-center px-4 z-20"
       style={{
         left: sidebarWidth,
         height: 56,

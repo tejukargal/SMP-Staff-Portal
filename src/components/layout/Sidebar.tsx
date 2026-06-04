@@ -27,7 +27,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const textStyle = (extraDelay = 0): React.CSSProperties => ({
     overflow: 'hidden',
     whiteSpace: 'nowrap',
-    maxWidth: collapsed ? 0 : '160px',
+    maxWidth: collapsed ? 0 : '120px',
     opacity: collapsed ? 0 : 1,
     transition: collapsed
       ? `opacity 100ms ease, max-width 220ms cubic-bezier(0.4,0,0.2,1) ${extraDelay}ms`
@@ -58,7 +58,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
     <aside
       className="no-print sidebar fixed left-0 top-0 bottom-0 flex flex-col z-30 overflow-hidden"
       style={{
-        width: collapsed ? 64 : 240,
+        width: collapsed ? 64 : 200,
         transition: 'width 220ms cubic-bezier(0.4, 0, 0.2, 1)',
         background: 'rgba(255,255,255,0.92)',
         backdropFilter: 'blur(20px)',
@@ -66,13 +66,14 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         boxShadow: '1px 0 12px 0 rgba(14,165,233,0.07)',
       }}
     >
-      {/* Brand */}
+      {/* Brand — height matches the app header so their bottom borders form one line */}
       <button
         onClick={onToggle}
         onMouseEnter={() => setLogoHovered(true)}
         onMouseLeave={() => setLogoHovered(false)}
         title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        className="group flex items-center gap-2 w-full cursor-pointer hover:bg-sky-50/50 transition-colors pt-5 pb-3 px-4"
+        className="group flex items-center gap-2 w-full cursor-pointer hover:bg-sky-50/50 transition-colors px-4 shrink-0"
+        style={{ height: 56, borderBottom: '1px solid #BAE6FD' }}
       >
         {/* Flip-card logo — front: SMP text, back: expand chevron */}
         <div className="relative w-9 h-9 shrink-0" style={{ perspective: '280px' }}>
@@ -135,11 +136,8 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         </span>
       </button>
 
-      {/* Divider */}
-      <div className="mx-3 h-px bg-sky-100 mb-2" />
-
       {/* Navigation */}
-      <nav className="flex-1 px-2 pb-2 space-y-0.5 overflow-y-auto overflow-x-hidden no-scrollbar">
+      <nav className="flex-1 px-2 py-2 space-y-0.5 overflow-y-auto overflow-x-hidden no-scrollbar">
         {NAV.map(({ to, label, icon: Icon, adminOnly }) => {
           if (adminOnly && !isAdmin) return null;
           return (

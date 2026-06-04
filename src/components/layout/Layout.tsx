@@ -20,7 +20,7 @@ export function AdminRoute() {
   return <Outlet />;
 }
 
-const SIDEBAR_W = 240;
+const SIDEBAR_W = 200;
 const SIDEBAR_W_COLLAPSED = 64;
 
 function Layout() {
@@ -42,7 +42,7 @@ function Layout() {
       >
         <Header sidebarWidth={sw} />
         <main
-          className="flex-1 min-h-0 p-6 overflow-y-auto"
+          className="flex-1 min-h-0 px-4 py-4 overflow-y-auto"
           style={{ marginTop: 56 }}
         >
           <div

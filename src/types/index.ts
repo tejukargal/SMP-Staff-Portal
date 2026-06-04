@@ -80,7 +80,7 @@ export type DesignationEnum =
   | 'LIBRARIAN'
   | 'OTHER';
 
-export type DeptEnum = 'OFFICE' | 'ME' | 'CE' | 'EC' | 'CS' | 'EE' | 'SCIENCE';
+export type DeptEnum = 'OFFICE' | 'ME' | 'CE' | 'EC' | 'CS' | 'SCIENCE' | 'ELECTRICAL' | 'EE';
 
 export type StatusEnum = 'IN SERVICE' | 'RTRD' | 'DECEASED' | 'RESIGNED' | 'TRANSFERRED';
 
