@@ -13,9 +13,10 @@ export function DeptBadge({ dept }: DeptBadgeProps) {
   const color = DEPT_COLORS[dept] ?? '#6B7280';
   return (
     <span
-      className="inline-flex items-center justify-center min-w-[5rem] py-0.5 rounded text-xs font-semibold text-white whitespace-nowrap"
-      style={{ backgroundColor: color }}
+      className="inline-flex items-center gap-1.5 min-w-[5rem] px-2.5 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap"
+      style={{ backgroundColor: `${color}18`, color }}
     >
+      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
       {dept}
     </span>
   );

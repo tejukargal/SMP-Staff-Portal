@@ -8,7 +8,7 @@ import { useStaff } from '@/hooks/useStaff';
 import { getSanctionedPosts } from '@/firebase/firestore';
 import { PageSpinner } from '@/components/ui/Spinner';
 import { DeptBadge } from '@/components/ui/Badge';
-import { DEPARTMENTS, DESIGNATIONS, DEPT_COLORS } from '@/constants/enums';
+import { DEPARTMENTS, DESIGNATIONS, DEPT_COLORS, DESIGNATION_ORDER } from '@/constants/enums';
 import type { DeptEnum, StaffRecord, SanctionedPost } from '@/types';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -102,9 +102,9 @@ function Panel({ title, subtitle, children, delay, action, className = '' }: {
 
 // ── Table helpers ─────────────────────────────────────────────────────────────
 
-function Th({ children, align = 'left', className = '' }: { children?: React.ReactNode; align?: 'left' | 'center' | 'right'; className?: string }) {
+function Th({ children, align = 'left', className = '', style }: { children?: React.ReactNode; align?: 'left' | 'center' | 'right'; className?: string; style?: React.CSSProperties }) {
   return (
-    <th className={`px-3 py-2.5 text-[10px] font-bold uppercase tracking-wider text-gray-500 bg-gray-50 text-${align} whitespace-nowrap ${className}`}>
+    <th className={`px-3 py-2.5 text-[10px] font-bold uppercase tracking-wider text-gray-500 bg-gray-50 text-${align} whitespace-nowrap ${className}`} style={style}>
       {children}
     </th>
   );
@@ -193,47 +193,54 @@ export default function Dashboard() {
     };
   }, [staff]);
 
-  const { totalSanctioned, totalFilled, totalVacant } = useMemo(() => {
-    const sanctioned = sanctionedPosts.reduce((s, p) => s + p.sanctionedCount, 0);
-    const inService  = staff.filter(s => s.status === 'IN SERVICE').length;
-    return {
-      totalSanctioned: sanctioned,
-      totalFilled:     inService,
-      totalVacant:     Math.max(0, sanctioned - inService),
-    };
+  const TEACHING_DESIGS = new Set(['PRINCIPAL', 'HOD', 'SEL GR LECT', 'LECTURER']);
+
+  const { totalSanctioned, totalFilled, totalVacant, deptVacancyStats } = useMemo(() => {
+    // Build dept+designation in-service counts once for all computations below
+    const inSvcMap: Record<string, number> = {};
+    staff.filter(s => s.status === 'IN SERVICE').forEach(s => {
+      const k = `${s.dept}_${s.designation}`;
+      inSvcMap[k] = (inSvcMap[k] ?? 0) + 1;
+    });
+
+    // Per-designation in-service count; LECTURER posts absorb SEL GR LECT staff too
+    function getInSvc(dept: string, designation: string): number {
+      if (designation === 'LECTURER')
+        return (inSvcMap[`${dept}_LECTURER`] ?? 0) + (inSvcMap[`${dept}_SEL GR LECT`] ?? 0);
+      return inSvcMap[`${dept}_${designation}`] ?? 0;
+    }
+
+    // SEL GR LECT fills LECTURER posts — exclude its own rows to avoid double-counting
+    const effectivePosts  = sanctionedPosts.filter(p => p.designation !== 'SEL GR LECT');
+
+    const totalSanctioned = effectivePosts.reduce((s, p) => s + p.sanctionedCount, 0);
+    const totalFilled     = staff.filter(s => s.status === 'IN SERVICE').length;
+    const totalVacant     = effectivePosts.reduce((sum, p) =>
+      sum + Math.max(0, p.sanctionedCount - getInSvc(p.dept, p.designation)), 0);
+
+    const deptVacancyStats = DEPARTMENTS.map(dept => {
+      const deptPosts    = effectivePosts.filter(p => p.dept === dept);
+      const sanctionedT  = deptPosts.filter(p =>  TEACHING_DESIGS.has(p.designation)).reduce((s, p) => s + p.sanctionedCount, 0);
+      const sanctionedNT = deptPosts.filter(p => !TEACHING_DESIGS.has(p.designation)).reduce((s, p) => s + p.sanctionedCount, 0);
+      const sanctioned   = sanctionedT + sanctionedNT;
+
+      const deptInSvc = staff.filter(s => s.dept === dept && s.status === 'IN SERVICE');
+      const filledT   = deptInSvc.filter(s => s.type === 'TEACHING').length;
+      const filledNT  = deptInSvc.filter(s => s.type === 'NON-TEACHING').length;
+      const inService = filledT + filledNT;
+
+      const vacant   = deptPosts.reduce((sum, p) => sum + Math.max(0, p.sanctionedCount - getInSvc(dept, p.designation)), 0);
+      const vacantT  = deptPosts.filter(p =>  TEACHING_DESIGS.has(p.designation)).reduce((sum, p) => sum + Math.max(0, p.sanctionedCount - getInSvc(dept, p.designation)), 0);
+      const vacantNT = deptPosts.filter(p => !TEACHING_DESIGS.has(p.designation)).reduce((sum, p) => sum + Math.max(0, p.sanctionedCount - getInSvc(dept, p.designation)), 0);
+
+      return { dept: dept as DeptEnum, sanctioned, sanctionedT, sanctionedNT, inService, filledT, filledNT, vacant, vacantT, vacantNT };
+    });
+
+    return { totalSanctioned, totalFilled, totalVacant, deptVacancyStats };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sanctionedPosts, staff]);
 
   const [detailModal, setDetailModal] = useState<'sanctioned' | 'filled' | 'vacant' | null>(null);
-
-  // ── Dept × type breakdown (in-service only) ────────────────────────────────
-  const deptStats = useMemo(() =>
-    DEPARTMENTS.map(dept => {
-      const all       = staff.filter(s => s.dept === dept);
-      const inService = all.filter(s => s.status === 'IN SERVICE');
-      return {
-        dept: dept as DeptEnum,
-        total:       all.length,
-        inService:   inService.length,
-        teaching:    inService.filter(s => s.type === 'TEACHING').length,
-        nonTeaching: inService.filter(s => s.type === 'NON-TEACHING').length,
-      };
-    }),
-    [staff]
-  );
-
-  // ── Dept vacancy stats (sanctioned vs in-service) ──────────────────────────
-  const deptVacancyStats = useMemo(() =>
-    DEPARTMENTS.map(dept => {
-      const sanctioned = sanctionedPosts
-        .filter(p => p.dept === dept)
-        .reduce((sum, p) => sum + p.sanctionedCount, 0);
-      const inService = staff.filter(s => s.dept === dept && s.status === 'IN SERVICE').length;
-      const vacant = Math.max(0, sanctioned - inService);
-      return { dept: dept as DeptEnum, sanctioned, inService, vacant };
-    }),
-    [sanctionedPosts, staff]
-  );
-
 
   // ── Dept × designation vacancy matrix ─────────────────────────────────────
   const vacancyMatrix = useMemo(() => {
@@ -254,16 +261,16 @@ export default function Dashboard() {
       return { desig, cells, totSanctioned, totVacant };
     }
 
-    function buildMergedRow(desigs: string[], label: string) {
+    // LECT & SEL GR: sanctioned comes only from LECTURER posts; both groups fill them
+    function buildLecturerRow() {
       const cells = DEPARTMENTS.map(dept => {
-        const sanctioned = desigs.reduce((sum, d) =>
-          sum + (sanctionedPosts.find(p => p.dept === dept && p.designation === d)?.sanctionedCount ?? 0), 0);
-        const filled = desigs.reduce((sum, d) => sum + (inSvc[`${dept}_${d}`] ?? 0), 0);
+        const sanctioned = sanctionedPosts.find(p => p.dept === dept && p.designation === 'LECTURER')?.sanctionedCount ?? 0;
+        const filled = (inSvc[`${dept}_LECTURER`] ?? 0) + (inSvc[`${dept}_SEL GR LECT`] ?? 0);
         return { sanctioned, filled, vacant: Math.max(0, sanctioned - filled) };
       });
       const totSanctioned = cells.reduce((s, c) => s + c.sanctioned, 0);
       const totVacant     = cells.reduce((s, c) => s + c.vacant, 0);
-      return { desig: label, cells, totSanctioned, totVacant };
+      return { desig: 'LECT & SEL GR', cells, totSanctioned, totVacant };
     }
 
     function subtotal(rows: ReturnType<typeof buildRow>[]) {
@@ -277,17 +284,14 @@ export default function Dashboard() {
       };
     }
 
-    const NON_TEACHING_DESIGS = ['SUPDT.', 'FDC', 'SDC', 'TYPIST', 'GROUP D', 'MECHANIC', 'HELPER', 'OPERATOR', 'LIBRARIAN', 'OTHER'];
-    const ACCOUNTED_DESIGS    = ['PRINCIPAL', 'HOD', 'SEL GR LECT', 'LECTURER', 'INSTRUCTOR', 'ASST. INST', 'SYS. ANALIST', ...NON_TEACHING_DESIGS];
+    const NON_TEACHING_DESIGS = ['SUPDT.', 'FDC', 'SDC', 'TYPIST', 'ATTENDER', 'GROUP D', 'INSTRUCTOR', 'ASST. INST', 'SYS. ANALIST', 'MECHANIC', 'HELPER', 'OPERATOR', 'LIBRARIAN', 'OTHER'];
+    const ACCOUNTED_DESIGS    = ['PRINCIPAL', 'HOD', 'SEL GR LECT', 'LECTURER', ...NON_TEACHING_DESIGS];
     const OTHER_DESIGS        = DESIGNATIONS.filter(d => !ACCOUNTED_DESIGS.includes(d));
 
     const teachingRows = [
       buildRow('PRINCIPAL'),
       buildRow('HOD'),
-      buildMergedRow(['SEL GR LECT', 'LECTURER'], 'LECT & SEL GR'),
-      buildRow('INSTRUCTOR'),
-      buildRow('ASST. INST'),
-      buildRow('SYS. ANALIST'),
+      buildLecturerRow(),
     ].filter(r => r.totSanctioned > 0);
 
     const nonTeachingRows  = NON_TEACHING_DESIGS.map(buildRow).filter(r => r.totSanctioned > 0);
@@ -302,52 +306,48 @@ export default function Dashboard() {
   }, [sanctionedPosts, staff]);
 
   // ── Designation breakdown (in-service) ─────────────────────────────────────
-  const designationBreakdown = useMemo(() => {
+  const { designationBreakdown, designationTotal } = useMemo(() => {
     const map: Record<string, number> = {};
     staff.filter(s => s.status === 'IN SERVICE')
          .forEach(s => { map[s.designation] = (map[s.designation] ?? 0) + 1; });
-    return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 9);
+    const sorted = Object.entries(map).sort(([a], [b]) => {
+      const ai = DESIGNATION_ORDER.indexOf(a);
+      const bi = DESIGNATION_ORDER.indexOf(b);
+      const an = ai === -1 ? DESIGNATION_ORDER.length : ai;
+      const bn = bi === -1 ? DESIGNATION_ORDER.length : bi;
+      return an - bn;
+    });
+    return { designationBreakdown: sorted, designationTotal: sorted.reduce((s, [, c]) => s + c, 0) };
   }, [staff]);
 
   const maxDesig = Math.max(...designationBreakdown.map(d => d[1]), 1);
 
-  // ── Category (GEN/OBC/SC/ST…) breakdown ───────────────────────────────────
-  const { catRows, catTotals } = useMemo(() => {
-    const map: Record<string, { tInSvc: number; tOthers: number; ntInSvc: number; ntOthers: number }> = {};
-    staff.forEach(s => {
-      const key = (s.category?.trim().toUpperCase()) || 'NOT SPECIFIED';
-      if (!map[key]) map[key] = { tInSvc: 0, tOthers: 0, ntInSvc: 0, ntOthers: 0 };
-      const isInSvc = s.status === 'IN SERVICE';
-      const isT = s.type === 'TEACHING';
-      if (isT  &&  isInSvc) map[key].tInSvc++;
-      if (isT  && !isInSvc) map[key].tOthers++;
-      if (!isT &&  isInSvc) map[key].ntInSvc++;
-      if (!isT && !isInSvc) map[key].ntOthers++;
+  // ── Category × Dept in-service matrix ─────────────────────────────────────
+  const { catDeptRows, catDeptColTotals, catDeptGrandTotal } = useMemo(() => {
+    const matrix: Record<string, Record<string, number>> = {};
+    staff.filter(s => s.status === 'IN SERVICE').forEach(s => {
+      const cat = s.category?.trim().toUpperCase() || 'NOT SPECIFIED';
+      if (!matrix[cat]) matrix[cat] = {};
+      matrix[cat][s.dept] = (matrix[cat][s.dept] ?? 0) + 1;
     });
     const ORDER = ['GEN', 'OBC', 'SC', 'ST'];
-    const rows = Object.entries(map)
+    const rows = Object.entries(matrix)
       .sort(([a], [b]) => {
         const ai = ORDER.indexOf(a), bi = ORDER.indexOf(b);
         if (ai !== -1 && bi !== -1) return ai - bi;
-        if (ai !== -1) return -1;
-        if (bi !== -1) return 1;
+        if (ai !== -1) return -1; if (bi !== -1) return 1;
         return a.localeCompare(b);
       })
-      .map(([cat, v]) => ({
+      .map(([cat, deptCounts]) => ({
         cat,
-        tInSvc: v.tInSvc, tOthers: v.tOthers, tTotal: v.tInSvc + v.tOthers,
-        ntInSvc: v.ntInSvc, ntOthers: v.ntOthers, ntTotal: v.ntInSvc + v.ntOthers,
-        total: v.tInSvc + v.tOthers + v.ntInSvc + v.ntOthers,
+        deptCounts,
+        total: DEPARTMENTS.reduce((s, d) => s + (deptCounts[d] ?? 0), 0),
       }));
-    const totals = rows.reduce(
-      (acc, r) => ({
-        tInSvc: acc.tInSvc + r.tInSvc, tOthers: acc.tOthers + r.tOthers, tTotal: acc.tTotal + r.tTotal,
-        ntInSvc: acc.ntInSvc + r.ntInSvc, ntOthers: acc.ntOthers + r.ntOthers, ntTotal: acc.ntTotal + r.ntTotal,
-        total: acc.total + r.total,
-      }),
-      { tInSvc: 0, tOthers: 0, tTotal: 0, ntInSvc: 0, ntOthers: 0, ntTotal: 0, total: 0 }
+    const colTotals = Object.fromEntries(
+      DEPARTMENTS.map(d => [d, rows.reduce((s, r) => s + (r.deptCounts[d] ?? 0), 0)])
     );
-    return { catRows: rows, catTotals: totals };
+    const grandTotal = rows.reduce((s, r) => s + r.total, 0);
+    return { catDeptRows: rows, catDeptColTotals: colTotals, catDeptGrandTotal: grandTotal };
   }, [staff]);
 
   // ── Dept × category full breakdown (all statuses) ─────────────────────────
@@ -623,7 +623,7 @@ export default function Dashboard() {
           <table className="w-full text-xs border-collapse [&_th]:border-r [&_th]:border-gray-100 [&_td]:border-r [&_td]:border-gray-100">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="pl-5 pr-3 py-1.5 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide sticky left-0 bg-gray-50 z-10 w-36">Designation</th>
+                <th className="pl-5 pr-3 py-1.5 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide sticky left-0 bg-gray-50 z-10 w-44">Designation</th>
                 {DEPARTMENTS.map(dept => (
                   <th key={dept} className="px-3 py-1.5 text-center text-[11px] font-bold uppercase tracking-wide"
                     style={{ color: DEPT_COLORS[dept as DeptEnum] }}>
@@ -662,7 +662,7 @@ export default function Dashboard() {
               ))}
               {vacancyMatrix.teachingRows.length > 0 && (
                 <tr className="border-y border-violet-100 bg-violet-50/60">
-                  <td className="pl-5 pr-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-violet-600 sticky left-0 bg-violet-50/60">Teaching Sub.</td>
+                  <td className="pl-5 pr-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-violet-600 sticky left-0 bg-violet-50/60 whitespace-nowrap">Teaching Sub.</td>
                   {vacancyMatrix.teachingSub.cells.map((c, di) => (
                     <td key={di} className="px-3 py-1.5 text-center tabular-nums text-xs font-bold">
                       {c.sanctioned === 0 ? <span className="text-gray-200">—</span>
@@ -706,7 +706,7 @@ export default function Dashboard() {
               ))}
               {vacancyMatrix.nonTeachingRows.length > 0 && (
                 <tr className="border-y border-amber-100 bg-amber-50/60">
-                  <td className="pl-5 pr-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-amber-600 sticky left-0 bg-amber-50/60">Non-Teaching Sub.</td>
+                  <td className="pl-5 pr-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-amber-600 sticky left-0 bg-amber-50/60 whitespace-nowrap">Non-Teaching Sub.</td>
                   {vacancyMatrix.nonTeachingSub.cells.map((c, di) => (
                     <td key={di} className="px-3 py-1.5 text-center tabular-nums text-xs font-bold">
                       {c.sanctioned === 0 ? <span className="text-gray-200">—</span>
@@ -745,59 +745,61 @@ export default function Dashboard() {
         </div>
       </Panel>
 
-      {/* ── Row 4: Dept Summary table ─────────────────────────────────────── */}
-      <Panel title="Department Summary" subtitle="All statuses combined" delay={480}>
+      {/* ── Row 4: Dept vacancy summary table ────────────────────────────── */}
+      <Panel title="Department Vacancy Summary" subtitle="Sanctioned vs filled vs vacant · Teaching / Non-Teaching" delay={480}>
         <div className="overflow-x-auto -mx-5 -mb-5">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm border-collapse [&_th]:border-r [&_th]:border-gray-100 [&_td]:border-r [&_td]:border-gray-100">
             <thead>
-              <tr>
-                <Th className="pl-5 rounded-tl-xl">Department</Th>
-                <Th align="center">Total Staff</Th>
-                <Th align="center">In Service</Th>
-                <Th align="center" className="text-violet-600">Teaching</Th>
-                <Th align="center" className="text-amber-600">Non-Teaching</Th>
-                <Th align="center" className="pr-5 rounded-tr-xl">Retired / Others</Th>
+              {/* Group headers */}
+              <tr className="border-b border-gray-100">
+                <th className="pl-5 px-3 py-1.5 text-left bg-gray-50" rowSpan={2} />
+                <th colSpan={3} className="px-3 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider text-sky-700 bg-sky-50 border-r border-sky-200">Sanctioned</th>
+                <th colSpan={3} className="px-3 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider text-green-700 bg-green-50 border-r border-green-200">Filled</th>
+                <th colSpan={3} className="px-3 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider text-red-600 bg-red-50">Vacant</th>
+              </tr>
+              {/* Sub-headers */}
+              <tr className="border-b border-gray-200">
+                <Th align="center" className="text-violet-500 bg-sky-50/60">T</Th>
+                <Th align="center" className="text-amber-500 bg-sky-50/60">NT</Th>
+                <Th align="center" className="text-sky-700 bg-sky-50/60 border-r border-sky-200">Total</Th>
+                <Th align="center" className="text-violet-500 bg-green-50/60">T</Th>
+                <Th align="center" className="text-amber-500 bg-green-50/60">NT</Th>
+                <Th align="center" className="text-green-700 bg-green-50/60 border-r border-green-200">Total</Th>
+                <Th align="center" className="text-violet-500 bg-red-50/60">T</Th>
+                <Th align="center" className="text-amber-500 bg-red-50/60">NT</Th>
+                <Th align="center" className="text-red-600 bg-red-50/60">Total</Th>
               </tr>
             </thead>
             <tbody>
-              {deptStats.map(({ dept, total, inService, teaching, nonTeaching }, i) => {
-                const others = total - inService;
-                return (
-                  <tr
-                    key={dept}
-                    className="border-t border-gray-50 hover:bg-sky-50/40 transition-colors"
-                    style={{ animation: `content-enter 0.3s ease-out ${500 + i * 40}ms both` }}
-                  >
-                    <Td className="pl-5"><DeptBadge dept={dept} /></Td>
-                    <Td align="center"><span className="font-bold text-gray-800 tabular-nums">{total}</span></Td>
-                    <Td align="center">
-                      <div className="flex items-center justify-center gap-2">
-                        <span className="font-bold text-gray-800 tabular-nums w-6 text-right">{inService}</span>
-                        {total > 0 && (
-                          <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                            <div
-                              className="h-full rounded-full"
-                              style={{ width: `${(inService / total) * 100}%`, backgroundColor: DEPT_COLORS[dept] }}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </Td>
-                    <Td align="center"><span className="font-bold text-violet-600 tabular-nums">{teaching || '—'}</span></Td>
-                    <Td align="center"><span className="font-bold text-amber-600 tabular-nums">{nonTeaching || '—'}</span></Td>
-                    <Td align="center" className="pr-5">
-                      <span className={`tabular-nums font-bold ${others > 0 ? 'text-gray-500' : 'text-gray-200'}`}>{others || '—'}</span>
-                    </Td>
-                  </tr>
-                );
-              })}
-              <tr className="border-t-2 border-sky-100 bg-sky-50/60">
-                <td className="pl-5 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total</td>
-                <td className="py-2.5 text-center font-bold text-sky-700 tabular-nums text-sm">{stats.total}</td>
-                <td className="py-2.5 text-center font-bold text-sky-700 tabular-nums text-sm">{stats.inService}</td>
-                <td className="py-2.5 text-center font-bold text-violet-600 tabular-nums text-sm">{stats.teaching}</td>
-                <td className="py-2.5 text-center font-bold text-amber-600 tabular-nums text-sm">{stats.nonTeaching}</td>
-                <td className="pr-5 py-2.5 text-center font-bold text-gray-500 tabular-nums text-sm">{stats.total - stats.inService}</td>
+              {deptVacancyStats.map(({ dept, sanctioned, sanctionedT, sanctionedNT, inService, filledT, filledNT, vacant, vacantT, vacantNT }, i) => (
+                <tr
+                  key={dept}
+                  className="border-t border-gray-50 hover:bg-gray-50/60 transition-colors"
+                  style={{ animation: `content-enter 0.3s ease-out ${500 + i * 40}ms both` }}
+                >
+                  <Td className="pl-5 bg-white"><DeptBadge dept={dept} /></Td>
+                  <Td align="center" className="bg-sky-50/30"><Num v={sanctionedT}  color="#7C3AED" /></Td>
+                  <Td align="center" className="bg-sky-50/30"><Num v={sanctionedNT} color="#D97706" /></Td>
+                  <Td align="center" className="bg-sky-50/50"><span className="font-bold text-sky-700 tabular-nums">{sanctioned || <span className="text-gray-300">—</span>}</span></Td>
+                  <Td align="center" className="bg-green-50/30"><Num v={filledT}  color="#7C3AED" /></Td>
+                  <Td align="center" className="bg-green-50/30"><Num v={filledNT} color="#D97706" /></Td>
+                  <Td align="center" className="bg-green-50/50"><span className="font-bold text-green-700 tabular-nums">{inService || <span className="text-gray-300">—</span>}</span></Td>
+                  <Td align="center" className="bg-red-50/30">{vacantT  > 0 ? <span className="font-bold text-red-500 tabular-nums">{vacantT}</span>  : <span className="text-gray-300 font-semibold">0</span>}</Td>
+                  <Td align="center" className="bg-red-50/30">{vacantNT > 0 ? <span className="font-bold text-red-500 tabular-nums">{vacantNT}</span> : <span className="text-gray-300 font-semibold">0</span>}</Td>
+                  <Td align="center" className="bg-red-50/50">{vacant   > 0 ? <span className="font-bold text-red-600 tabular-nums">{vacant}</span>   : <span className="text-gray-300 font-semibold">0</span>}</Td>
+                </tr>
+              ))}
+              <tr className="border-t-2 border-gray-200">
+                <td className="pl-5 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider bg-gray-50">Total</td>
+                <td className="py-2.5 text-center font-bold text-violet-600 tabular-nums text-sm bg-sky-100">{deptVacancyStats.reduce((s, d) => s + d.sanctionedT,  0)}</td>
+                <td className="py-2.5 text-center font-bold text-amber-600  tabular-nums text-sm bg-sky-100">{deptVacancyStats.reduce((s, d) => s + d.sanctionedNT, 0)}</td>
+                <td className="py-2.5 text-center font-bold text-sky-700    tabular-nums text-sm bg-sky-100">{totalSanctioned}</td>
+                <td className="py-2.5 text-center font-bold text-violet-600 tabular-nums text-sm bg-green-100">{deptVacancyStats.reduce((s, d) => s + d.filledT,  0)}</td>
+                <td className="py-2.5 text-center font-bold text-amber-600  tabular-nums text-sm bg-green-100">{deptVacancyStats.reduce((s, d) => s + d.filledNT, 0)}</td>
+                <td className="py-2.5 text-center font-bold text-green-700  tabular-nums text-sm bg-green-100">{totalFilled}</td>
+                <td className="py-2.5 text-center font-bold text-violet-600 tabular-nums text-sm bg-red-100">{deptVacancyStats.reduce((s, d) => s + d.vacantT,  0) || <span className="text-gray-400">0</span>}</td>
+                <td className="py-2.5 text-center font-bold text-amber-600  tabular-nums text-sm bg-red-100">{deptVacancyStats.reduce((s, d) => s + d.vacantNT, 0) || <span className="text-gray-400">0</span>}</td>
+                <td className="py-2.5 text-center font-bold tabular-nums text-sm bg-red-100">{totalVacant > 0 ? <span className="text-red-600">{totalVacant}</span> : <span className="text-gray-400">0</span>}</td>
               </tr>
             </tbody>
           </table>
@@ -808,73 +810,69 @@ export default function Dashboard() {
       <div className="grid grid-cols-3 gap-4">
 
         {/* Designation breakdown */}
-        <Panel title="By Designation" subtitle="In-service only" delay={560} className="h-full">
+        <Panel title="By Designation" subtitle="In-service only" delay={560} className="h-full flex flex-col">
           {designationBreakdown.length === 0
             ? <p className="text-sm text-gray-300">No data yet</p>
             : (
-              <div className="flex flex-col flex-1 justify-between">
-                {designationBreakdown.map(([desig, count]) => (
-                  <div key={desig} className="flex items-center gap-2.5">
-                    <span className="text-xs font-semibold text-gray-700 flex-1 truncate" title={desig}>{desig}</span>
-                    <div className="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden shrink-0">
-                      <div
-                        className="h-full rounded-full bg-sky-400"
-                        style={{
-                          width: `${(count / maxDesig) * 100}%`,
-                          animation: 'bar-grow 0.5s ease-out both',
-                          transformOrigin: 'left',
-                        }}
-                      />
+              <div className="flex flex-col flex-1 -mb-5">
+                {/* Rows — grow to fill available space */}
+                <div className="flex flex-col gap-1.5 flex-1 justify-between pb-2">
+                  {designationBreakdown.map(([desig, count]) => (
+                    <div key={desig} className="flex items-center gap-2.5">
+                      <span className="text-xs font-semibold text-gray-700 flex-1 truncate" title={desig}>{desig}</span>
+                      <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden shrink-0">
+                        <div
+                          className="h-full rounded-full bg-sky-400"
+                          style={{
+                            width: `${(count / maxDesig) * 100}%`,
+                            animation: 'bar-grow 0.5s ease-out both',
+                            transformOrigin: 'left',
+                          }}
+                        />
+                      </div>
+                      <span className="text-xs font-bold text-gray-800 tabular-nums w-5 text-right shrink-0">{count}</span>
                     </div>
-                    <span className="text-xs font-bold text-gray-800 tabular-nums w-5 text-right shrink-0">{count}</span>
-                  </div>
-                ))}
+                  ))}
+                </div>
+                {/* Total row — matches adjacent table total styling */}
+                <div className="flex items-center -mx-5 px-5 py-2.5 border-t-2 border-sky-100 bg-sky-50/60 shrink-0">
+                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider flex-1">Total</span>
+                  <span className="text-sm font-bold text-sky-700 tabular-nums">{designationTotal}</span>
+                </div>
               </div>
             )}
         </Panel>
 
         {/* Dept × category table */}
-        <Panel title="Department × Category" subtitle="All staff · Teaching vs Non-Teaching" delay={580} className="col-span-2">
+        <Panel title="Department × Category" subtitle="In-service · Teaching vs Non-Teaching" delay={580} className="col-span-2">
           <div className="overflow-x-auto -mx-5 -mb-5">
             <table className="w-full text-sm">
               <thead>
                 <tr>
                   <Th className="pl-5">Dept</Th>
-                  <Th align="center" className="text-violet-500">T · InSvc</Th>
-                  <Th align="center" className="text-violet-300">T · Others</Th>
-                  <Th align="center" className="text-violet-700">T · Sub</Th>
-                  <Th align="center" className="text-amber-500">NT · InSvc</Th>
-                  <Th align="center" className="text-amber-300">NT · Others</Th>
-                  <Th align="center" className="text-amber-700">NT · Sub</Th>
+                  <Th align="center" className="text-violet-600">Teaching</Th>
+                  <Th align="center" className="text-amber-600">Non-Teaching</Th>
                   <Th align="right" className="pr-5">Total</Th>
                 </tr>
               </thead>
               <tbody>
-                {categoryStats.map(({ dept, tInSvc, tOthers, tTotal, ntInSvc, ntOthers, ntTotal, total }, i) => (
+                {categoryStats.map(({ dept, tInSvc, ntInSvc }, i) => (
                   <tr
                     key={dept}
                     className="border-t border-gray-50 hover:bg-sky-50/40 transition-colors"
                     style={{ animation: `content-enter 0.3s ease-out ${600 + i * 40}ms both` }}
                   >
                     <Td className="pl-5"><DeptBadge dept={dept} /></Td>
-                    <Td align="center"><Num v={tInSvc}   color="#7C3AED" /></Td>
-                    <Td align="center"><Num v={tOthers}  color="#a78bfa" /></Td>
-                    <Td align="center"><Num v={tTotal}   color="#6D28D9" /></Td>
-                    <Td align="center"><Num v={ntInSvc}  color="#D97706" /></Td>
-                    <Td align="center"><Num v={ntOthers} color="#fbbf24" /></Td>
-                    <Td align="center"><Num v={ntTotal}  color="#B45309" /></Td>
-                    <Td align="right" className="pr-5"><Num v={total} /></Td>
+                    <Td align="center"><Num v={tInSvc}  color="#7C3AED" /></Td>
+                    <Td align="center"><Num v={ntInSvc} color="#D97706" /></Td>
+                    <Td align="right" className="pr-5"><Num v={tInSvc + ntInSvc} /></Td>
                   </tr>
                 ))}
                 <tr className="border-t-2 border-sky-100 bg-sky-50/60">
                   <td className="pl-5 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total</td>
                   <td className="py-2.5 text-center font-bold text-violet-600 tabular-nums text-sm">{categoryTotals.tInSvc}</td>
-                  <td className="py-2.5 text-center font-bold text-violet-400 tabular-nums text-sm">{categoryTotals.tOthers}</td>
-                  <td className="py-2.5 text-center font-bold text-violet-700 tabular-nums text-sm">{categoryTotals.tTotal}</td>
                   <td className="py-2.5 text-center font-bold text-amber-600 tabular-nums text-sm">{categoryTotals.ntInSvc}</td>
-                  <td className="py-2.5 text-center font-bold text-amber-400 tabular-nums text-sm">{categoryTotals.ntOthers}</td>
-                  <td className="py-2.5 text-center font-bold text-amber-700 tabular-nums text-sm">{categoryTotals.ntTotal}</td>
-                  <td className="pr-5 py-2.5 text-right font-bold text-sky-700 tabular-nums text-sm">{categoryTotals.total}</td>
+                  <td className="pr-5 py-2.5 text-right font-bold text-sky-700 tabular-nums text-sm">{categoryTotals.tInSvc + categoryTotals.ntInSvc}</td>
                 </tr>
               </tbody>
             </table>
@@ -883,54 +881,49 @@ export default function Dashboard() {
 
       </div>
 
-      {/* ── Row 6: Category-wise table ───────────────────────────────────── */}
-      <Panel title="Category-wise Staff Count" subtitle="All staff · Teaching vs Non-Teaching" delay={640}>
+      {/* ── Row 6: Category × Dept matrix ───────────────────────────────── */}
+      <Panel title="Category-wise Staff Count" subtitle="In-service staff by category and department" delay={640}>
         <div className="overflow-x-auto -mx-5 -mb-5">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm border-collapse [&_th]:border-r [&_th]:border-gray-100 [&_td]:border-r [&_td]:border-gray-100">
             <thead>
-              <tr>
-                <Th className="pl-5">Category</Th>
-                <Th align="center" className="text-violet-500">T · In Svc</Th>
-                <Th align="center" className="text-violet-300">T · Others</Th>
-                <Th align="center" className="text-violet-700">T · Sub</Th>
-                <Th align="center" className="text-amber-500">NT · In Svc</Th>
-                <Th align="center" className="text-amber-300">NT · Others</Th>
-                <Th align="center" className="text-amber-700">NT · Sub</Th>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <Th className="pl-5 sticky left-0 bg-gray-50 z-10">Category</Th>
+                {DEPARTMENTS.map(dept => (
+                  <Th key={dept} align="center" style={{ color: DEPT_COLORS[dept as DeptEnum] }}>{dept}</Th>
+                ))}
                 <Th align="right" className="pr-5">Total</Th>
               </tr>
             </thead>
             <tbody>
-              {catRows.length === 0 ? (
+              {catDeptRows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-sm text-gray-300">No category data recorded yet</td>
+                  <td colSpan={DEPARTMENTS.length + 2} className="py-8 text-center text-sm text-gray-300">No category data recorded yet</td>
                 </tr>
-              ) : catRows.map(({ cat, tInSvc, tOthers, tTotal, ntInSvc, ntOthers, ntTotal, total }, i) => (
+              ) : catDeptRows.map(({ cat, deptCounts, total }, i) => (
                 <tr
                   key={cat}
-                  className="border-t border-gray-50 hover:bg-sky-50/40 transition-colors"
+                  className="border-b border-gray-50 hover:bg-sky-50/40 transition-colors"
                   style={{ animation: `content-enter 0.3s ease-out ${660 + i * 40}ms both` }}
                 >
-                  <Td className="pl-5">
+                  <Td className="pl-5 sticky left-0 bg-white">
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-50 text-sky-700 border border-sky-100">{cat}</span>
                   </Td>
-                  <Td align="center"><Num v={tInSvc}   color="#7C3AED" /></Td>
-                  <Td align="center"><Num v={tOthers}  color="#a78bfa" /></Td>
-                  <Td align="center"><Num v={tTotal}   color="#6D28D9" /></Td>
-                  <Td align="center"><Num v={ntInSvc}  color="#D97706" /></Td>
-                  <Td align="center"><Num v={ntOthers} color="#fbbf24" /></Td>
-                  <Td align="center"><Num v={ntTotal}  color="#B45309" /></Td>
-                  <Td align="right" className="pr-5"><Num v={total} /></Td>
+                  {DEPARTMENTS.map(dept => (
+                    <Td key={dept} align="center">
+                      <Num v={deptCounts[dept] ?? 0} color={DEPT_COLORS[dept as DeptEnum]} />
+                    </Td>
+                  ))}
+                  <Td align="right" className="pr-5"><span className="font-bold tabular-nums text-gray-800">{total}</span></Td>
                 </tr>
               ))}
               <tr className="border-t-2 border-sky-100 bg-sky-50/60">
-                <td className="pl-5 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total</td>
-                <td className="py-2.5 text-center font-bold text-violet-600 tabular-nums text-sm">{catTotals.tInSvc}</td>
-                <td className="py-2.5 text-center font-bold text-violet-400 tabular-nums text-sm">{catTotals.tOthers}</td>
-                <td className="py-2.5 text-center font-bold text-violet-700 tabular-nums text-sm">{catTotals.tTotal}</td>
-                <td className="py-2.5 text-center font-bold text-amber-600 tabular-nums text-sm">{catTotals.ntInSvc}</td>
-                <td className="py-2.5 text-center font-bold text-amber-400 tabular-nums text-sm">{catTotals.ntOthers}</td>
-                <td className="py-2.5 text-center font-bold text-amber-700 tabular-nums text-sm">{catTotals.ntTotal}</td>
-                <td className="pr-5 py-2.5 text-right font-bold text-sky-700 tabular-nums text-sm">{catTotals.total}</td>
+                <td className="pl-5 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider sticky left-0 bg-sky-50/60">Total</td>
+                {DEPARTMENTS.map(dept => (
+                  <td key={dept} className="py-2.5 text-center font-bold tabular-nums text-sm" style={{ color: DEPT_COLORS[dept as DeptEnum] }}>
+                    {catDeptColTotals[dept] || <span className="text-gray-300">—</span>}
+                  </td>
+                ))}
+                <td className="pr-5 py-2.5 text-right font-bold text-sky-700 tabular-nums text-sm">{catDeptGrandTotal}</td>
               </tr>
             </tbody>
           </table>

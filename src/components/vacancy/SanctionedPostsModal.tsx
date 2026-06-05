@@ -26,9 +26,9 @@ export function SanctionedPostsModal({ dept, onClose, onSaved }: Props) {
     getSanctionedPosts()
       .then((posts: SanctionedPost[]) => {
         const map: Record<string, number> = {};
-        posts.filter((p) => p.dept === dept).forEach((p) => {
-          map[p.designation] = p.sanctionedCount;
-        });
+        posts
+          .filter((p) => p.dept === dept && p.designation !== 'SEL GR LECT')
+          .forEach((p) => { map[p.designation] = p.sanctionedCount; });
         setCounts(map);
       })
       .finally(() => setLoading(false));
@@ -37,12 +37,16 @@ export function SanctionedPostsModal({ dept, onClose, onSaved }: Props) {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const promises = DESIGNATIONS.filter((d) => d !== 'SEL GR LECT').map((d) => {
-        const count = counts[d] ?? 0;
-        return count > 0
-          ? upsertSanctionedPost(dept, d, count)
-          : deleteSanctionedPost(dept, d);
-      });
+      const promises = [
+        // Clean up any legacy SEL GR LECT rows — they fill LECTURER posts, not separate posts
+        deleteSanctionedPost(dept, 'SEL GR LECT'),
+        ...DESIGNATIONS.filter((d) => d !== 'SEL GR LECT').map((d) => {
+          const count = counts[d] ?? 0;
+          return count > 0
+            ? upsertSanctionedPost(dept, d, count)
+            : deleteSanctionedPost(dept, d);
+        }),
+      ];
       await Promise.all(promises);
       showToast('success', 'Sanctioned posts saved');
       onSaved();
@@ -64,9 +68,14 @@ export function SanctionedPostsModal({ dept, onClose, onSaved }: Props) {
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
-          <h3 className="text-base font-semibold text-gray-900">
-            Sanctioned Posts — {dept}
-          </h3>
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">
+              Sanctioned Posts — {dept}
+            </h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Total: <span className="font-bold text-sky-600">{Object.values(counts).reduce((s, v) => s + v, 0)}</span>
+            </p>
+          </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <X className="w-4 h-4" />
           </button>
@@ -85,7 +94,7 @@ export function SanctionedPostsModal({ dept, onClose, onSaved }: Props) {
           >
             {DESIGNATIONS.filter((d) => d !== 'SEL GR LECT').map((d) => (
               <div key={d} className="flex items-center justify-between gap-3">
-                <span className="text-sm text-gray-700 flex-1">{d}</span>
+                <span className="text-base text-gray-700 flex-1">{d}</span>
                 <input
                   type="number"
                   min={0}
@@ -93,7 +102,7 @@ export function SanctionedPostsModal({ dept, onClose, onSaved }: Props) {
                   onChange={(e) =>
                     setCounts((prev) => ({ ...prev, [d]: Math.max(0, parseInt(e.target.value) || 0) }))
                   }
-                  className="w-16 text-center text-sm px-2 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-400"
+                  className="w-18 text-center text-base font-medium px-2 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-sky-400"
                 />
               </div>
             ))}

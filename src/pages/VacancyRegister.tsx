@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Settings2, PlusCircle, CheckCircle2, Pencil, Trash2 } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Settings2, PlusCircle, CheckCircle2, Pencil, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { PageSpinner } from '@/components/ui/Spinner';
 import { useToast } from '@/components/ui/Toast';
 import { useRole } from '@/hooks/useRole';
 import {
@@ -12,8 +13,8 @@ import {
 } from '@/firebase/firestore';
 import { SanctionedPostsModal } from '@/components/vacancy/SanctionedPostsModal';
 import { VacancyEventModal } from '@/components/vacancy/VacancyEventModal';
-import { DEPARTMENTS, DEPT_COLORS, VACANCY_REASON_LABELS, APPOINTMENT_TYPE_LABELS } from '@/constants/enums';
-import type { SanctionedPost, VacancyEvent } from '@/types';
+import { DEPARTMENTS, DEPT_COLORS, DESIGNATION_ORDER, VACANCY_REASON_LABELS, APPOINTMENT_TYPE_LABELS } from '@/constants/enums';
+import type { SanctionedPost, StaffRecord, VacancyEvent } from '@/types';
 
 type DeptKey = typeof DEPARTMENTS[number];
 
@@ -38,6 +39,9 @@ export default function VacancyRegister() {
   const [events, setEvents] = useState<VacancyEvent[]>([]);
   const [inServiceCounts, setInServiceCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const hasLoaded = useRef(false);
+
+  const [allStaff, setAllStaff] = useState<StaffRecord[]>([]);
 
   const [showSanctioned, setShowSanctioned] = useState(false);
   const [addModal, setAddModal] = useState(false);
@@ -54,6 +58,7 @@ export default function VacancyRegister() {
       ]);
       setSanctionedPosts(posts);
       setEvents(allEvents);
+      setAllStaff(allStaff);
 
       // Count IN SERVICE staff per dept+designation
       const counts: Record<string, number> = {};
@@ -64,6 +69,7 @@ export default function VacancyRegister() {
           counts[key] = (counts[key] ?? 0) + 1;
         });
       setInServiceCounts(counts);
+      hasLoaded.current = true;
     } catch {
       showToast('error', 'Failed to load vacancy data');
     } finally {
@@ -73,19 +79,33 @@ export default function VacancyRegister() {
 
   useEffect(() => { void fetchAll(); }, [fetchAll]);
 
-  // Dept-level stats (sanctioned across all designations in dept)
+  // Dept-level stats — vacant is summed per designation to avoid over-staffed
+  // designations masking vacancies in under-staffed ones.
   function getDeptStats(dept: DeptKey): DeptStats {
-    const sanctioned = sanctionedPosts
-      .filter((p) => p.dept === dept)
-      .reduce((sum, p) => sum + p.sanctionedCount, 0);
+    const deptPosts = sanctionedPosts.filter((p) => p.dept === dept && p.designation !== 'SEL GR LECT');
+    const sanctioned = deptPosts.reduce((sum, p) => sum + p.sanctionedCount, 0);
     const filled = Object.entries(inServiceCounts)
       .filter(([key]) => key.startsWith(`${dept}_`))
       .reduce((sum, [, cnt]) => sum + cnt, 0);
-    return { sanctioned, filled, vacant: Math.max(0, sanctioned - filled) };
+    const vacant = deptPosts.reduce((sum, p) => {
+      const inSvc = p.designation === 'LECTURER'
+        ? (inServiceCounts[`${dept}_LECTURER`] ?? 0) + (inServiceCounts[`${dept}_SEL GR LECT`] ?? 0)
+        : (inServiceCounts[`${dept}_${p.designation}`] ?? 0);
+      return sum + Math.max(0, p.sanctionedCount - inSvc);
+    }, 0);
+    return { sanctioned, filled, vacant };
   }
 
   const deptEvents = events.filter((e) => e.dept === activeDept);
   const stats = getDeptStats(activeDept);
+
+  const overallStats = DEPARTMENTS.reduce(
+    (acc, d) => {
+      const s = getDeptStats(d as DeptKey);
+      return { sanctioned: acc.sanctioned + s.sanctioned, filled: acc.filled + s.filled, vacant: acc.vacant + s.vacant };
+    },
+    { sanctioned: 0, filled: 0, vacant: 0 },
+  );
 
   const handleConfirm = async (event: VacancyEvent) => {
     try {
@@ -116,8 +136,10 @@ export default function VacancyRegister() {
     void fetchAll();
   };
 
+  if (loading && !hasLoaded.current) return <PageSpinner />;
+
   return (
-    <div className="h-full flex flex-col gap-4">
+    <div className="h-full flex flex-col gap-2" style={{ animation: 'page-enter 0.35s ease-out' }}>
       {/* Page header */}
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-gray-900" style={{ fontFamily: "'DM Serif Display', serif" }}>
@@ -125,49 +147,29 @@ export default function VacancyRegister() {
         </h1>
       </div>
 
-      {/* Dept tabs */}
-      <div className="flex gap-1 flex-wrap">
-        {DEPARTMENTS.map((dept) => {
-          const s = getDeptStats(dept as DeptKey);
-          const isActive = activeDept === dept;
-          const color = DEPT_COLORS[dept as DeptKey];
-          return (
-            <button
-              key={dept}
-              onClick={() => setActiveDept(dept as DeptKey)}
-              className={[
-                'px-4 py-2 rounded-xl text-sm font-semibold transition-all border',
-                isActive
-                  ? 'text-white shadow-md'
-                  : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300',
-              ].join(' ')}
-              style={isActive ? { background: color, borderColor: color } : {}}
-            >
-              {dept}
-              {s.vacant > 0 && (
-                <span
-                  className={[
-                    'ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full',
-                    isActive ? 'bg-white/25 text-white' : 'bg-red-100 text-red-700',
-                  ].join(' ')}
-                >
-                  {s.vacant}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Active dept panel */}
+      {/* Main card */}
       <div className="flex-1 bg-white rounded-2xl border border-gray-200 shadow-sm flex flex-col overflow-hidden">
 
-        {/* Stats + Edit Sanctioned */}
-        <div className="flex flex-wrap items-center gap-4 px-5 py-4 border-b border-gray-100">
-          <div className="flex gap-6">
-            <StatPill label="Sanctioned" value={stats.sanctioned} color="sky" />
-            <StatPill label="Filled"     value={stats.filled}     color="green" />
-            <StatPill label="Vacant"     value={stats.vacant}     color="red" />
+        {/* Overall stats + Edit Sanctioned */}
+        <div className="flex flex-wrap items-center gap-4 px-5 py-2 border-b border-gray-100">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Overall:</span>
+              <div className="flex gap-3">
+                <StatPill label="Sanctioned" value={overallStats.sanctioned} color="sky" />
+                <StatPill label="Filled"     value={overallStats.filled}     color="green" />
+                <StatPill label="Vacant"     value={overallStats.vacant}     color="red" />
+              </div>
+            </div>
+            <div className="w-0.5 h-8 rounded-full bg-gray-300" />
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-wider" style={{ color: DEPT_COLORS[activeDept] }}>{activeDept}:</span>
+              <div className="flex gap-3">
+                <StatPill label="Sanctioned" value={stats.sanctioned} color="sky" />
+                <StatPill label="Filled"     value={stats.filled}     color="green" />
+                <StatPill label="Vacant"     value={stats.vacant}     color="red" />
+              </div>
+            </div>
           </div>
           {isAdmin && (
             <div className="ml-auto">
@@ -177,6 +179,40 @@ export default function VacancyRegister() {
               </Button>
             </div>
           )}
+        </div>
+
+        {/* Dept tabs — integrated inside the card */}
+        <div className="flex gap-1 flex-wrap px-4 py-2.5 border-b border-gray-100 bg-gray-50/50">
+          {DEPARTMENTS.map((dept) => {
+            const s = getDeptStats(dept as DeptKey);
+            const isActive = activeDept === dept;
+            const color = DEPT_COLORS[dept as DeptKey];
+            return (
+              <button
+                key={dept}
+                onClick={() => setActiveDept(dept as DeptKey)}
+                className={[
+                  'px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border',
+                  isActive
+                    ? 'text-white shadow-sm'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300',
+                ].join(' ')}
+                style={isActive ? { background: color, borderColor: color } : {}}
+              >
+                {dept}
+                {s.vacant > 0 && (
+                  <span
+                    className={[
+                      'ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full',
+                      isActive ? 'bg-white/25 text-white' : 'bg-red-100 text-red-700',
+                    ].join(' ')}
+                  >
+                    {s.vacant}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* Sub-tabs */}
@@ -214,6 +250,7 @@ export default function VacancyRegister() {
               dept={activeDept}
               sanctionedPosts={sanctionedPosts}
               inServiceCounts={inServiceCounts}
+              allStaff={allStaff}
             />
           </div>
         )}
@@ -372,8 +409,8 @@ function StatPill({ label, value, color }: { label: string; value: number; color
     red:   { num: 'text-red-700',   bg: 'bg-red-50',   lbl: 'text-red-500' },
   }[color];
   return (
-    <div className={`flex items-center gap-2 rounded-xl px-3 py-2 ${styles.bg}`}>
-      <span className={`text-xl font-bold ${styles.num}`}>{value}</span>
+    <div className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 ${styles.bg}`}>
+      <span className={`text-base font-bold ${styles.num}`}>{value}</span>
       <span className={`text-xs font-medium ${styles.lbl}`}>{label}</span>
     </div>
   );
@@ -385,17 +422,93 @@ const LECTURER_SUB_DESIGNATIONS: { key: string; label: string }[] = [
   { key: 'LECTURER',    label: 'Lecturer' },
 ];
 
+function designationSortIndex(designation: string): number {
+  const idx = DESIGNATION_ORDER.indexOf(designation);
+  return idx === -1 ? DESIGNATION_ORDER.length : idx;
+}
+
+function FilledStaffModal({
+  dept,
+  designation,
+  staff,
+  onClose,
+}: {
+  dept: string;
+  designation: string;
+  staff: StaffRecord[];
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ backgroundColor: 'rgba(0,0,0,0.35)' }}
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-72 flex flex-col"
+        style={{ animation: 'modal-enter 0.2s cubic-bezier(0.34,1.26,0.64,1)', maxHeight: '22rem' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
+          <div>
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{dept}</p>
+            <h4 className="text-sm font-bold text-gray-900 leading-tight">{designation}</h4>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
+              {staff.length} filled
+            </span>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+        <div className="overflow-y-auto flex-1 px-4 py-2">
+          {staff.length === 0 ? (
+            <p className="text-center text-gray-400 text-sm py-4">No staff in service</p>
+          ) : (
+            <ol className="space-y-1.5">
+              {staff.map((s, i) => (
+                <li key={s.id ?? i} className="flex items-start gap-2">
+                  <span className="text-xs text-gray-400 w-4 shrink-0 mt-0.5">{i + 1}.</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-800 truncate">{s.name}</p>
+                    <p className="text-xs text-gray-400">{s.empId} · {s.designation}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DesignationSummary({
   dept,
   sanctionedPosts,
   inServiceCounts,
+  allStaff,
 }: {
   dept: string;
   sanctionedPosts: SanctionedPost[];
   inServiceCounts: Record<string, number>;
+  allStaff: StaffRecord[];
 }) {
+  const [selectedDesig, setSelectedDesig] = useState<{ designation: string; isLecturer: boolean } | null>(null);
+
+  const filledStaff = selectedDesig
+    ? allStaff.filter((s) => {
+        if (s.status !== 'IN SERVICE' || s.dept !== dept) return false;
+        if (selectedDesig.isLecturer) return s.designation === 'LECTURER' || s.designation === 'SEL GR LECT';
+        return s.designation === selectedDesig.designation;
+      })
+    : [];
+
   const rows = sanctionedPosts
     .filter((p) => p.dept === dept && p.sanctionedCount > 0 && p.designation !== 'SEL GR LECT')
+    .sort((a, b) => designationSortIndex(a.designation) - designationSortIndex(b.designation))
     .map((p) => {
       if (p.designation === 'LECTURER') {
         const subRows = LECTURER_SUB_DESIGNATIONS.map((s) => ({
@@ -422,72 +535,93 @@ function DesignationSummary({
   const totalVacant     = rows.reduce((s, r) => s + r.vacant, 0);
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Scrollable rows */}
-      <div className="flex-1 overflow-y-auto px-5 pt-3">
-        <table className="w-full text-xs table-fixed">
-          <thead className="sticky top-0 bg-white z-10">
-            <tr className="text-gray-400 uppercase tracking-wide border-b border-gray-100">
-              <th className="py-1.5 text-left font-medium">Designation</th>
-              <th className="py-1.5 text-center font-medium w-20">Sanctioned</th>
-              <th className="py-1.5 text-center font-medium w-16">Filled</th>
-              <th className="py-1.5 text-center font-medium w-16">Vacant</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.flatMap((r) => {
-              const mainRow = (
-                <tr key={r.designation} className="border-b border-gray-50">
-                  <td className="py-1.5 text-gray-700 font-medium">{r.designation}</td>
-                  <td className="py-1.5 text-center text-gray-600">{r.sanctioned}</td>
-                  <td className="py-1.5 text-center text-green-700 font-semibold">{r.filled}</td>
-                  <td className="py-1.5 text-center">
-                    {r.vacant > 0
-                      ? <span className="text-red-600 font-bold">{r.vacant}</span>
-                      : <span className="text-gray-400">0</span>}
-                  </td>
-                </tr>
-              );
-              if (!r.subRows) return [mainRow];
-              return [
-                mainRow,
-                ...r.subRows.map((sr) => (
-                  <tr key={sr.key} className="border-b border-gray-50/50 bg-gray-50/40">
-                    <td className="py-1 pl-7 text-gray-500 italic">↳ {sr.label}</td>
-                    <td className="py-1 text-center text-gray-300">—</td>
-                    <td className="py-1 text-center text-green-600">{sr.filled}</td>
-                    <td className="py-1 text-center text-gray-300">—</td>
+    <>
+      <div className="flex flex-col h-full">
+        {/* Scrollable rows */}
+        <div className="flex-1 overflow-y-auto px-5 pt-3">
+          <table className="w-full text-sm table-fixed">
+            <thead className="sticky top-0 bg-white z-10">
+              <tr className="text-gray-400 uppercase tracking-wide border-b border-gray-100">
+                <th className="py-2 text-left font-medium">Designation</th>
+                <th className="py-2 text-center font-medium w-24">Sanctioned</th>
+                <th className="py-2 text-center font-medium w-20">Filled</th>
+                <th className="py-2 text-center font-medium w-20">Vacant</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.flatMap((r) => {
+                const isLecturer = r.designation === 'LECTURER';
+                const mainRow = (
+                  <tr
+                    key={r.designation}
+                    className="border-b border-gray-50 cursor-pointer hover:bg-gray-50 transition-colors"
+                    onClick={() => setSelectedDesig({ designation: r.designation, isLecturer })}
+                  >
+                    <td className="py-2 text-gray-700 font-medium">{r.designation}</td>
+                    <td className="py-2 text-center text-gray-600">{r.sanctioned}</td>
+                    <td className="py-2 text-center text-green-700 font-semibold">{r.filled}</td>
+                    <td className="py-2 text-center">
+                      {r.vacant > 0
+                        ? <span className="text-red-600 font-bold">{r.vacant}</span>
+                        : <span className="text-gray-400">0</span>}
+                    </td>
                   </tr>
-                )),
-              ];
-            })}
-          </tbody>
-        </table>
+                );
+                if (!r.subRows) return [mainRow];
+                return [
+                  mainRow,
+                  ...r.subRows.map((sr) => (
+                    <tr key={sr.key} className="border-b border-gray-50/50 bg-gray-50/40">
+                      <td className="py-1.5 pl-7 text-gray-500 italic">
+                        <span className="flex items-center gap-2">
+                          <span>↳ {sr.label}</span>
+                          <span className="not-italic font-semibold text-green-700">{sr.filled}</span>
+                        </span>
+                      </td>
+                      <td className="py-1 text-center text-gray-300">—</td>
+                      <td className="py-1 text-center text-gray-300">—</td>
+                      <td className="py-1 text-center text-gray-300">—</td>
+                    </tr>
+                  )),
+                ];
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Total row — pinned at the bottom */}
+        <div className="px-5 pb-3 shrink-0">
+          <table className="w-full text-sm table-fixed border-t-2 border-gray-200">
+            <colgroup>
+              <col />
+              <col className="w-24" />
+              <col className="w-20" />
+              <col className="w-20" />
+            </colgroup>
+            <tbody>
+              <tr className="bg-gray-50/60">
+                <td className="py-2 text-gray-800 font-bold">Total</td>
+                <td className="py-2 text-center text-gray-700 font-bold">{totalSanctioned}</td>
+                <td className="py-2 text-center text-green-700 font-bold">{totalFilled}</td>
+                <td className="py-2 text-center font-bold">
+                  {totalVacant > 0
+                    ? <span className="text-red-600">{totalVacant}</span>
+                    : <span className="text-gray-400">0</span>}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {/* Total row — pinned at the bottom */}
-      <div className="px-5 pb-3 shrink-0">
-        <table className="w-full text-xs table-fixed border-t-2 border-gray-200">
-          <colgroup>
-            <col />
-            <col className="w-20" />
-            <col className="w-16" />
-            <col className="w-16" />
-          </colgroup>
-          <tbody>
-            <tr className="bg-gray-50/60">
-              <td className="py-2 text-gray-800 font-bold">Total</td>
-              <td className="py-2 text-center text-gray-700 font-bold">{totalSanctioned}</td>
-              <td className="py-2 text-center text-green-700 font-bold">{totalFilled}</td>
-              <td className="py-2 text-center font-bold">
-                {totalVacant > 0
-                  ? <span className="text-red-600">{totalVacant}</span>
-                  : <span className="text-gray-400">0</span>}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+      {selectedDesig && (
+        <FilledStaffModal
+          dept={dept}
+          designation={selectedDesig.isLecturer ? 'LECTURER / SEL GR LECT' : selectedDesig.designation}
+          staff={filledStaff}
+          onClose={() => setSelectedDesig(null)}
+        />
+      )}
+    </>
   );
 }

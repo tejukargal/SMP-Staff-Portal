@@ -18,6 +18,7 @@ export const DESIGNATIONS: DesignationEnum[] = [
   'HOD',
   'LIBRARIAN',
   'ENGLISH PART TIME',
+  'ATTENDER',
   'OTHER',
 ];
 
@@ -29,7 +30,6 @@ export const DEPARTMENTS: DeptEnum[] = [
   'CS',
   'SCIENCE',
   'ELECTRICAL',
-  'EE',
 ];
 
 export const STATUSES: StatusEnum[] = [
@@ -45,7 +45,6 @@ export const DEPT_COLORS: Record<DeptEnum, string> = {
   ME: '#10B981',
   EC: '#8B5CF6',
   CS: '#F59E0B',
-  EE: '#EF4444',
   OFFICE: '#6B7280',
   SCIENCE: '#06B6D4',
   ELECTRICAL: '#F97316',
@@ -73,6 +72,28 @@ export const PAY_SCALES = [
 export const MONTHS = [
   'JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE',
   'JULY', 'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER',
+];
+
+export const DESIGNATION_ORDER: string[] = [
+  'PRINCIPAL',
+  'SUPDT.',
+  'FDC',
+  'SDC',
+  'TYPIST',
+  'ATTENDER',
+  'GROUP D',
+  'HOD',
+  'LECTURER',
+  'SEL GR LECT',
+  'SYS. ANALIST',
+  'OPERATOR',
+  'INSTRUCTOR',
+  'ASST. INST',
+  'MECHANIC',
+  'HELPER',
+  'LIBRARIAN',
+  'ENGLISH PART TIME',
+  'OTHER',
 ];
 
 export const APPOINTMENT_TYPE_LABELS: Record<string, string> = {

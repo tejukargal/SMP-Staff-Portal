@@ -79,9 +79,10 @@ export type DesignationEnum =
   | 'HOD'
   | 'LIBRARIAN'
   | 'ENGLISH PART TIME'
+  | 'ATTENDER'
   | 'OTHER';
 
-export type DeptEnum = 'OFFICE' | 'ME' | 'CE' | 'EC' | 'CS' | 'SCIENCE' | 'ELECTRICAL' | 'EE';
+export type DeptEnum = 'OFFICE' | 'ME' | 'CE' | 'EC' | 'CS' | 'SCIENCE' | 'ELECTRICAL';
 
 export type StatusEnum = 'IN SERVICE' | 'RTRD' | 'DECEASED' | 'RESIGNED' | 'TRANSFERRED';
 
