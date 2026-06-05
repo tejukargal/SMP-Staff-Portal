@@ -78,6 +78,7 @@ export type DesignationEnum =
   | 'OPERATOR'
   | 'HOD'
   | 'LIBRARIAN'
+  | 'ENGLISH PART TIME'
   | 'OTHER';
 
 export type DeptEnum = 'OFFICE' | 'ME' | 'CE' | 'EC' | 'CS' | 'SCIENCE' | 'ELECTRICAL' | 'EE';

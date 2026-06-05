@@ -82,16 +82,16 @@ function Panel({ title, subtitle, children, delay, action, className = '' }: {
 }) {
   return (
     <div
-      className={`bg-white rounded-2xl border border-gray-100 p-5 flex flex-col gap-4 ${className}`}
+      className={`bg-white rounded-2xl border border-gray-100 px-5 pt-3 pb-5 flex flex-col gap-3 ${className}`}
       style={{
         animation: `content-enter 0.35s ease-out ${delay}ms both`,
         boxShadow: '0 1px 6px rgba(0,0,0,0.05)',
       }}
     >
       <div className="flex items-center justify-between">
-        <div>
+        <div className="flex items-baseline gap-2">
           <h2 className="text-sm font-bold text-gray-800">{title}</h2>
-          {subtitle && <p className="text-[10px] text-gray-400 mt-0.5">{subtitle}</p>}
+          {subtitle && <p className="text-[10px] text-gray-400">{subtitle}</p>}
         </div>
         {action}
       </div>
@@ -254,6 +254,18 @@ export default function Dashboard() {
       return { desig, cells, totSanctioned, totVacant };
     }
 
+    function buildMergedRow(desigs: string[], label: string) {
+      const cells = DEPARTMENTS.map(dept => {
+        const sanctioned = desigs.reduce((sum, d) =>
+          sum + (sanctionedPosts.find(p => p.dept === dept && p.designation === d)?.sanctionedCount ?? 0), 0);
+        const filled = desigs.reduce((sum, d) => sum + (inSvc[`${dept}_${d}`] ?? 0), 0);
+        return { sanctioned, filled, vacant: Math.max(0, sanctioned - filled) };
+      });
+      const totSanctioned = cells.reduce((s, c) => s + c.sanctioned, 0);
+      const totVacant     = cells.reduce((s, c) => s + c.vacant, 0);
+      return { desig: label, cells, totSanctioned, totVacant };
+    }
+
     function subtotal(rows: ReturnType<typeof buildRow>[]) {
       return {
         cells: DEPARTMENTS.map((_, i) => ({
@@ -265,12 +277,19 @@ export default function Dashboard() {
       };
     }
 
-    const TEACHING_DESIGS     = ['PRINCIPAL', 'HOD', 'SEL GR LECT', 'LECTURER', 'INSTRUCTOR', 'ASST. INST', 'SYS. ANALIST'];
     const NON_TEACHING_DESIGS = ['SUPDT.', 'FDC', 'SDC', 'TYPIST', 'GROUP D', 'MECHANIC', 'HELPER', 'OPERATOR', 'LIBRARIAN', 'OTHER'];
-    // Preserve any designation not in either group
-    const OTHER_DESIGS = DESIGNATIONS.filter(d => !TEACHING_DESIGS.includes(d) && !NON_TEACHING_DESIGS.includes(d) && d !== 'SEL GR LECT');
+    const ACCOUNTED_DESIGS    = ['PRINCIPAL', 'HOD', 'SEL GR LECT', 'LECTURER', 'INSTRUCTOR', 'ASST. INST', 'SYS. ANALIST', ...NON_TEACHING_DESIGS];
+    const OTHER_DESIGS        = DESIGNATIONS.filter(d => !ACCOUNTED_DESIGS.includes(d));
 
-    const teachingRows     = TEACHING_DESIGS.map(buildRow).filter(r => r.totSanctioned > 0);
+    const teachingRows = [
+      buildRow('PRINCIPAL'),
+      buildRow('HOD'),
+      buildMergedRow(['SEL GR LECT', 'LECTURER'], 'LECT & SEL GR'),
+      buildRow('INSTRUCTOR'),
+      buildRow('ASST. INST'),
+      buildRow('SYS. ANALIST'),
+    ].filter(r => r.totSanctioned > 0);
+
     const nonTeachingRows  = NON_TEACHING_DESIGS.map(buildRow).filter(r => r.totSanctioned > 0);
     const otherRows        = OTHER_DESIGS.map(buildRow).filter(r => r.totSanctioned > 0);
 
@@ -601,34 +620,34 @@ export default function Dashboard() {
         delay={320}
       >
         <div className="-mx-5 -mb-5 overflow-x-auto">
-          <table className="w-full text-xs border-collapse">
+          <table className="w-full text-xs border-collapse [&_th]:border-r [&_th]:border-gray-100 [&_td]:border-r [&_td]:border-gray-100">
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                <th className="pl-5 pr-3 py-2.5 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide sticky left-0 bg-gray-50 z-10 w-36">Designation</th>
+              <tr className="bg-gray-50 border-b border-gray-200">
+                <th className="pl-5 pr-3 py-1.5 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide sticky left-0 bg-gray-50 z-10 w-36">Designation</th>
                 {DEPARTMENTS.map(dept => (
-                  <th key={dept} className="px-3 py-2.5 text-center text-[11px] font-bold uppercase tracking-wide"
+                  <th key={dept} className="px-3 py-1.5 text-center text-[11px] font-bold uppercase tracking-wide"
                     style={{ color: DEPT_COLORS[dept as DeptEnum] }}>
                     {dept}
                   </th>
                 ))}
-                <th className="px-3 py-2.5 pr-5 text-center text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Total</th>
+                <th className="px-3 py-1.5 pr-5 text-center text-[11px] font-semibold text-gray-400 uppercase tracking-wide">Total</th>
               </tr>
             </thead>
             <tbody>
               {/* ── Teaching ── */}
               {vacancyMatrix.teachingRows.length > 0 && (
                 <tr>
-                  <td colSpan={DEPARTMENTS.length + 2} className="pl-5 pt-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-violet-500">
+                  <td colSpan={DEPARTMENTS.length + 2} className="pl-5 pt-2 pb-0.5 text-[10px] font-bold uppercase tracking-widest text-violet-500">
                     Teaching
                   </td>
                 </tr>
               )}
               {vacancyMatrix.teachingRows.map(({ desig, cells, totVacant }, i) => (
-                <tr key={desig} className="border-b border-gray-50 hover:bg-sky-50/40 transition-colors"
+                <tr key={desig} className="border-b border-gray-100 hover:bg-sky-50/40 transition-colors"
                   style={{ animation: `content-enter 0.25s ease-out ${340 + i * 25}ms both` }}>
-                  <td className="pl-5 pr-3 py-2 text-[13px] font-medium text-gray-700 sticky left-0 bg-white">{desig}</td>
+                  <td className="pl-5 pr-3 py-1.5 text-[13px] font-medium text-gray-700 sticky left-0 bg-white">{desig}</td>
                   {cells.map((c, di) => (
-                    <td key={di} className="px-3 py-2 text-center tabular-nums text-[13px]">
+                    <td key={di} className="px-3 py-1.5 text-center tabular-nums text-[13px]">
                       {c.sanctioned === 0
                         ? <span className="text-gray-200">—</span>
                         : c.vacant === 0
@@ -636,22 +655,22 @@ export default function Dashboard() {
                           : <span className="font-bold text-red-500">{c.vacant}</span>}
                     </td>
                   ))}
-                  <td className="px-3 pr-5 py-2 text-center tabular-nums text-[13px] font-bold">
+                  <td className="px-3 pr-5 py-1.5 text-center tabular-nums text-[13px] font-bold">
                     {totVacant > 0 ? <span className="text-red-500">{totVacant}</span> : <span className="text-gray-300">0</span>}
                   </td>
                 </tr>
               ))}
               {vacancyMatrix.teachingRows.length > 0 && (
                 <tr className="border-y border-violet-100 bg-violet-50/60">
-                  <td className="pl-5 pr-3 py-2 text-[11px] font-bold uppercase tracking-wider text-violet-600 sticky left-0 bg-violet-50/60">Teaching Sub.</td>
+                  <td className="pl-5 pr-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-violet-600 sticky left-0 bg-violet-50/60">Teaching Sub.</td>
                   {vacancyMatrix.teachingSub.cells.map((c, di) => (
-                    <td key={di} className="px-3 py-2 text-center tabular-nums text-xs font-bold">
+                    <td key={di} className="px-3 py-1.5 text-center tabular-nums text-xs font-bold">
                       {c.sanctioned === 0 ? <span className="text-gray-200">—</span>
                         : c.vacant > 0 ? <span className="text-red-500">{c.vacant}</span>
                         : <span className="text-gray-300">0</span>}
                     </td>
                   ))}
-                  <td className="px-3 pr-5 py-2 text-center text-xs font-bold">
+                  <td className="px-3 pr-5 py-1.5 text-center text-xs font-bold">
                     {vacancyMatrix.teachingSub.totVacant > 0
                       ? <span className="text-red-500">{vacancyMatrix.teachingSub.totVacant}</span>
                       : <span className="text-gray-300">0</span>}
@@ -662,17 +681,17 @@ export default function Dashboard() {
               {/* ── Non-Teaching ── */}
               {vacancyMatrix.nonTeachingRows.length > 0 && (
                 <tr>
-                  <td colSpan={DEPARTMENTS.length + 2} className="pl-5 pt-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-amber-500">
+                  <td colSpan={DEPARTMENTS.length + 2} className="pl-5 pt-2 pb-0.5 text-[10px] font-bold uppercase tracking-widest text-amber-500">
                     Non-Teaching
                   </td>
                 </tr>
               )}
               {vacancyMatrix.nonTeachingRows.map(({ desig, cells, totVacant }, i) => (
-                <tr key={desig} className="border-b border-gray-50 hover:bg-sky-50/40 transition-colors"
+                <tr key={desig} className="border-b border-gray-100 hover:bg-sky-50/40 transition-colors"
                   style={{ animation: `content-enter 0.25s ease-out ${400 + i * 25}ms both` }}>
-                  <td className="pl-5 pr-3 py-2 text-[13px] font-medium text-gray-700 sticky left-0 bg-white">{desig}</td>
+                  <td className="pl-5 pr-3 py-1.5 text-[13px] font-medium text-gray-700 sticky left-0 bg-white">{desig}</td>
                   {cells.map((c, di) => (
-                    <td key={di} className="px-3 py-2 text-center tabular-nums text-[13px]">
+                    <td key={di} className="px-3 py-1.5 text-center tabular-nums text-[13px]">
                       {c.sanctioned === 0
                         ? <span className="text-gray-200">—</span>
                         : c.vacant === 0
@@ -680,22 +699,22 @@ export default function Dashboard() {
                           : <span className="font-bold text-red-500">{c.vacant}</span>}
                     </td>
                   ))}
-                  <td className="px-3 pr-5 py-2 text-center tabular-nums text-[13px] font-bold">
+                  <td className="px-3 pr-5 py-1.5 text-center tabular-nums text-[13px] font-bold">
                     {totVacant > 0 ? <span className="text-red-500">{totVacant}</span> : <span className="text-gray-300">0</span>}
                   </td>
                 </tr>
               ))}
               {vacancyMatrix.nonTeachingRows.length > 0 && (
                 <tr className="border-y border-amber-100 bg-amber-50/60">
-                  <td className="pl-5 pr-3 py-2 text-[11px] font-bold uppercase tracking-wider text-amber-600 sticky left-0 bg-amber-50/60">Non-Teaching Sub.</td>
+                  <td className="pl-5 pr-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-amber-600 sticky left-0 bg-amber-50/60">Non-Teaching Sub.</td>
                   {vacancyMatrix.nonTeachingSub.cells.map((c, di) => (
-                    <td key={di} className="px-3 py-2 text-center tabular-nums text-xs font-bold">
+                    <td key={di} className="px-3 py-1.5 text-center tabular-nums text-xs font-bold">
                       {c.sanctioned === 0 ? <span className="text-gray-200">—</span>
                         : c.vacant > 0 ? <span className="text-red-500">{c.vacant}</span>
                         : <span className="text-gray-300">0</span>}
                     </td>
                   ))}
-                  <td className="px-3 pr-5 py-2 text-center text-xs font-bold">
+                  <td className="px-3 pr-5 py-1.5 text-center text-xs font-bold">
                     {vacancyMatrix.nonTeachingSub.totVacant > 0
                       ? <span className="text-red-500">{vacancyMatrix.nonTeachingSub.totVacant}</span>
                       : <span className="text-gray-300">0</span>}
@@ -705,9 +724,9 @@ export default function Dashboard() {
 
               {/* ── Grand total ── */}
               <tr className="bg-sky-50/70 border-t-2 border-sky-100">
-                <td className="pl-5 pr-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-sky-700 sticky left-0 bg-sky-50/70">Total</td>
+                <td className="pl-5 pr-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-sky-700 sticky left-0 bg-sky-50/70">Total</td>
                 {vacancyMatrix.grandTotal.cells.map((c, di) => (
-                  <td key={di} className="px-3 py-2.5 text-center tabular-nums font-bold text-sm">
+                  <td key={di} className="px-3 py-1.5 text-center tabular-nums font-bold text-sm">
                     {c.sanctioned === 0
                       ? <span className="text-gray-200 text-xs">—</span>
                       : c.vacant > 0
@@ -715,7 +734,7 @@ export default function Dashboard() {
                         : <span className="text-gray-300 text-xs">0</span>}
                   </td>
                 ))}
-                <td className="px-3 pr-5 py-2.5 text-center font-bold text-sm">
+                <td className="px-3 pr-5 py-1.5 text-center font-bold text-sm">
                   {vacancyMatrix.grandTotal.totVacant > 0
                     ? <span className="text-red-600">{vacancyMatrix.grandTotal.totVacant}</span>
                     : <span className="text-green-600">0</span>}

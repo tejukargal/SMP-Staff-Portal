@@ -17,6 +17,7 @@ export const DESIGNATIONS: DesignationEnum[] = [
   'OPERATOR',
   'HOD',
   'LIBRARIAN',
+  'ENGLISH PART TIME',
   'OTHER',
 ];
 
