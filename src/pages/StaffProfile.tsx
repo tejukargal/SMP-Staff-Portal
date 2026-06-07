@@ -581,7 +581,7 @@ export default function StaffProfile() {
             salaryLoading ? (
               <div className="flex justify-center py-10"><Spinner /></div>
             ) : (
-              <div className="px-5 py-4 space-y-3">
+              <div className="h-full flex flex-col px-5 py-4 gap-2">
 
                 {/* Table */}
                 {!salarySlips || salarySlips.length === 0 ? (
@@ -590,7 +590,7 @@ export default function StaffProfile() {
                   </p>
                 ) : (
                   <>
-                  <div className="rounded-xl border border-gray-100 overflow-auto max-h-[420px]">
+                  <div className="flex-1 min-h-0 rounded-xl border border-gray-100 overflow-auto">
                       <table className="w-full text-xs border-collapse">
                         <thead className="sticky top-0 z-10">
                           <tr className="bg-gray-50 border-b border-gray-200">
@@ -675,7 +675,7 @@ export default function StaffProfile() {
                         })()}
                       </table>
                   </div>
-                  <p className="text-[10px] text-gray-400 text-right mt-1 pr-1">
+                  <p className="text-[10px] text-gray-400 text-right pr-1">
                     {salarySlips.length} record{salarySlips.length !== 1 ? 's' : ''}
                   </p>
                   </>
