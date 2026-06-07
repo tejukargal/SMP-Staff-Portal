@@ -232,7 +232,6 @@ export function exportDeptVacancySummaryPdf(
 
   autoTable(doc, {
     startY,
-    margin: { left: M, right: M, top: M, bottom: 7 },
     head: [
       [
         { content: 'Dept',       rowSpan: 2, styles: { valign: 'middle', halign: 'left' } },

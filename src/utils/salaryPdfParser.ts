@@ -94,6 +94,7 @@ interface RawSlip {
   hraAmount: number;
   ir: number;
   sfn: number;
+  p: number;
   spayTypist: number;
   itDeduction: number;
   ptDeduction: number;
@@ -143,6 +144,7 @@ function parseBlock(slip: string): RawSlip | null {
     hraAmount:         n(/\bHRA\s+(\d+)/, slip),
     ir:                n(/\bIR\s+(\d+)/, slip),
     sfn:               n(/\bSFN\s+(\d+)/, slip),
+    p:                 n(/\bP\s+(\d+)/, slip),
     spayTypist:        n(/SPAY-TYPIST\s+(\d+)/, slip),
     itDeduction:       n(/\bIT\s+(\d+)/, slip),
     ptDeduction:       n(/\bPT\s+(\d+)/, slip),

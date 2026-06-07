@@ -182,6 +182,8 @@ export interface SalaryGrant {
   hraAmount: number;
   ir: number;
   sfn: number;
+  p: number;
+  spayTypist: number;
   gross: number;
   itDeduction: number;
   ptDeduction: number;
@@ -192,6 +194,8 @@ export interface SalaryGrant {
   netSalary: number;
   grantsOrderNo: string;
   grantsReceivedGross: number;
+  grantsReceivedDeductions: number;
+  grantsReceivedNet: number;
   salaryCreditedDate: string;
   deductionsReceivedDate: string;
   updatedAt?: Timestamp;
@@ -217,6 +221,7 @@ export interface SalarySlip {
   hraAmount: number;
   ir: number;
   sfn: number;
+  p: number;
   spayTypist: number;
   gross: number;
   itDeduction: number;

@@ -27,6 +27,7 @@ function fmtDate(iso: string): string {
 interface SlipAggregate {
   month: string; year: number; monthYear: string; staffCount: number;
   basicPay: number; daAmount: number; hraAmount: number; ir: number; sfn: number;
+  p: number; spayTypist: number;
   gross: number; itDeduction: number; ptDeduction: number; gslic: number;
   lic: number; fbf: number; totalDeductions: number; netSalary: number;
 }
@@ -47,7 +48,7 @@ function aggregateSlips(slips: SalarySlip[]): Map<string, SlipAggregate> {
     const key = s.monthYear;
     const a = map.get(key) ?? {
       month: s.month, year: s.year, monthYear: key, staffCount: 0,
-      basicPay: 0, daAmount: 0, hraAmount: 0, ir: 0, sfn: 0, gross: 0,
+      basicPay: 0, daAmount: 0, hraAmount: 0, ir: 0, sfn: 0, p: 0, spayTypist: 0, gross: 0,
       itDeduction: 0, ptDeduction: 0, gslic: 0, lic: 0, fbf: 0,
       totalDeductions: 0, netSalary: 0,
     };
@@ -57,6 +58,8 @@ function aggregateSlips(slips: SalarySlip[]): Map<string, SlipAggregate> {
     a.hraAmount      += s.hraAmount      || 0;
     a.ir             += s.ir             || 0;
     a.sfn            += s.sfn            || 0;
+    a.p              += s.p              || 0;
+    a.spayTypist     += s.spayTypist     || 0;
     a.gross          += s.gross          || 0;
     a.itDeduction    += s.itDeduction    || 0;
     a.ptDeduction    += s.ptDeduction    || 0;
@@ -82,6 +85,8 @@ function draftFromRow(row: GrantRow): EditDraft {
     hraAmount:              src?.hraAmount ?? 0,
     ir:                     src?.ir ?? 0,
     sfn:                    src?.sfn ?? 0,
+    p:                      src?.p ?? 0,
+    spayTypist:             src?.spayTypist ?? 0,
     gross:                  src?.gross ?? 0,
     itDeduction:            src?.itDeduction ?? 0,
     ptDeduction:            src?.ptDeduction ?? 0,
@@ -90,10 +95,12 @@ function draftFromRow(row: GrantRow): EditDraft {
     fbf:                    src?.fbf ?? 0,
     totalDeductions:        src?.totalDeductions ?? 0,
     netSalary:              src?.netSalary ?? 0,
-    grantsOrderNo:          row.grant?.grantsOrderNo ?? '',
-    grantsReceivedGross:    row.grant?.grantsReceivedGross ?? (src?.gross ?? 0),
-    salaryCreditedDate:     row.grant?.salaryCreditedDate ?? '',
-    deductionsReceivedDate: row.grant?.deductionsReceivedDate ?? '',
+    grantsOrderNo:             row.grant?.grantsOrderNo ?? '',
+    grantsReceivedGross:       row.grant?.grantsReceivedGross ?? (src?.gross ?? 0),
+    grantsReceivedDeductions:  row.grant?.grantsReceivedDeductions ?? (src?.totalDeductions ?? 0),
+    grantsReceivedNet:         row.grant?.grantsReceivedNet ?? (src?.netSalary ?? 0),
+    salaryCreditedDate:        row.grant?.salaryCreditedDate ?? '',
+    deductionsReceivedDate:    row.grant?.deductionsReceivedDate ?? '',
   };
 }
 
@@ -313,7 +320,7 @@ export default function SalaryGrants() {
             <p className="text-xs">Import salary PDFs in Salary Records, or click <strong>Add Grant Entry</strong></p>
           </div>
         ) : (
-          <table className="text-xs border-collapse w-full" style={{ minWidth: 1720 }}>
+          <table className="text-xs border-collapse w-full" style={{ minWidth: 2144 }}>
 
             {/* ── Two-row header ── */}
             <thead className="sticky top-0 z-20">
@@ -324,7 +331,7 @@ export default function SalaryGrants() {
                   className="bg-sky-50 border-b border-sky-100 border-r border-sky-200 px-3 py-1.5 text-[10px] font-bold text-sky-700 text-center tracking-wider uppercase whitespace-nowrap">
                   Period
                 </th>
-                <th colSpan={5}
+                <th colSpan={8}
                   className="bg-emerald-50 border-b border-emerald-100 border-r border-emerald-200 px-3 py-1.5 text-[10px] font-bold text-emerald-700 text-center tracking-wider uppercase whitespace-nowrap">
                   Salary Breakdown
                 </th>
@@ -336,7 +343,7 @@ export default function SalaryGrants() {
                   className="bg-teal-50 border-b border-teal-100 border-r border-teal-200 px-3 py-1.5 text-[10px] font-bold text-teal-700 text-center tracking-wider uppercase whitespace-nowrap">
                   Net
                 </th>
-                <th colSpan={4}
+                <th colSpan={6}
                   className="bg-amber-50 border-b border-amber-100 border-r border-amber-200 px-3 py-1.5 text-[10px] font-bold text-amber-700 text-center tracking-wider uppercase whitespace-nowrap">
                   Grant Administration
                 </th>
@@ -358,6 +365,9 @@ export default function SalaryGrants() {
                 <th className={`${TH} bg-emerald-50/95 text-right`} style={{ minWidth: 80 }}>DA</th>
                 <th className={`${TH} bg-emerald-50/95 text-right`} style={{ minWidth: 80 }}>HRA</th>
                 <th className={`${TH} bg-emerald-50/95 text-right`} style={{ minWidth: 72 }}>IR</th>
+                <th className={`${TH} bg-emerald-50/95 text-right`} style={{ minWidth: 70 }}>SFN</th>
+                <th className={`${TH} bg-emerald-50/95 text-right`} style={{ minWidth: 62 }}>P</th>
+                <th className={`${TH} bg-emerald-50/95 text-right`} style={{ minWidth: 80 }}>SPAY</th>
                 <th className={`${TH} bg-emerald-50/95 text-right border-r border-emerald-200`} style={{ minWidth: 90 }}>Gross</th>
 
                 {/* Deductions */}
@@ -373,7 +383,9 @@ export default function SalaryGrants() {
 
                 {/* Grant admin */}
                 <th className={`${TH} bg-amber-50/95 text-left`} style={{ minWidth: 160 }}>Grants Order No.</th>
-                <th className={`${TH} bg-amber-50/95 text-right`} style={{ minWidth: 106 }}>Grants Received</th>
+                <th className={`${TH} bg-amber-50/95 text-right`} style={{ minWidth: 106 }}>Grants (Gross)</th>
+                <th className={`${TH} bg-amber-50/95 text-right`} style={{ minWidth: 106 }}>Grants (Ded.)</th>
+                <th className={`${TH} bg-amber-50/95 text-right`} style={{ minWidth: 106 }}>Grants (Net)</th>
                 <th className={`${TH} bg-amber-50/95 text-center`} style={{ minWidth: 128 }}>Salary Credited</th>
                 <th className={`${TH} bg-amber-50/95 text-center border-r border-amber-200`} style={{ minWidth: 128 }}>Ded. Received</th>
 
@@ -441,6 +453,9 @@ export default function SalaryGrants() {
                         <td className={TD}>{numInput('daAmount')}</td>
                         <td className={TD}>{numInput('hraAmount')}</td>
                         <td className={TD}>{numInput('ir')}</td>
+                        <td className={TD}>{numInput('sfn')}</td>
+                        <td className={TD}>{numInput('p')}</td>
+                        <td className={TD}>{numInput('spayTypist')}</td>
                         <td className={`${TD} border-r border-gray-100`}>
                           {numInput('gross', 'border-emerald-300 focus:ring-emerald-400', 'text-emerald-800 font-semibold')}
                         </td>
@@ -470,6 +485,12 @@ export default function SalaryGrants() {
                           {numInput('grantsReceivedGross', 'border-amber-300 focus:ring-amber-400', 'text-amber-800 font-semibold')}
                         </td>
                         <td className={TD}>
+                          {numInput('grantsReceivedDeductions', 'border-amber-300 focus:ring-amber-400', 'text-red-700 font-semibold')}
+                        </td>
+                        <td className={TD}>
+                          {numInput('grantsReceivedNet', 'border-amber-300 focus:ring-amber-400', 'text-teal-700 font-bold')}
+                        </td>
+                        <td className={TD}>
                           <input type="date"
                             value={d?.salaryCreditedDate ?? ''}
                             onChange={(e) => patch({ salaryCreditedDate: e.target.value })}
@@ -491,6 +512,9 @@ export default function SalaryGrants() {
                         <td className={`${TD} text-right tabular-nums text-gray-600`}>{fmt(src?.daAmount ?? 0)}</td>
                         <td className={`${TD} text-right tabular-nums text-gray-600`}>{fmt(src?.hraAmount ?? 0)}</td>
                         <td className={`${TD} text-right tabular-nums text-gray-500`}>{fmt(src?.ir ?? 0)}</td>
+                        <td className={`${TD} text-right tabular-nums text-gray-500`}>{fmt(src?.sfn ?? 0)}</td>
+                        <td className={`${TD} text-right tabular-nums text-gray-500`}>{fmt(src?.p ?? 0)}</td>
+                        <td className={`${TD} text-right tabular-nums text-gray-500`}>{fmt(src?.spayTypist ?? 0)}</td>
                         <td className={`${TD} text-right tabular-nums font-semibold text-gray-800 border-r border-gray-100`}>
                           {fmt(src?.gross ?? 0)}
                         </td>
@@ -515,6 +539,16 @@ export default function SalaryGrants() {
                         <td className={`${TD} text-right tabular-nums`}>
                           {row.grant?.grantsReceivedGross
                             ? <span className="font-semibold text-amber-700">{fmt(row.grant.grantsReceivedGross)}</span>
+                            : <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className={`${TD} text-right tabular-nums`}>
+                          {row.grant?.grantsReceivedDeductions
+                            ? <span className="font-semibold text-red-600">{fmt(row.grant.grantsReceivedDeductions)}</span>
+                            : <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className={`${TD} text-right tabular-nums`}>
+                          {row.grant?.grantsReceivedNet
+                            ? <span className="font-bold text-teal-700">{fmt(row.grant.grantsReceivedNet)}</span>
                             : <span className="text-gray-300">—</span>}
                         </td>
                         <td className={`${TD} text-center`}>
@@ -585,6 +619,9 @@ export default function SalaryGrants() {
                     <td className="px-2.5 py-2 text-right tabular-nums font-bold text-gray-800">{fmt(sum('daAmount'))}</td>
                     <td className="px-2.5 py-2 text-right tabular-nums font-bold text-gray-800">{fmt(sum('hraAmount'))}</td>
                     <td className="px-2.5 py-2 text-right tabular-nums font-bold text-gray-800">{fmt(sum('ir'))}</td>
+                    <td className="px-2.5 py-2 text-right tabular-nums font-bold text-gray-800">{fmt(sum('sfn'))}</td>
+                    <td className="px-2.5 py-2 text-right tabular-nums font-bold text-gray-800">{fmt(sum('p'))}</td>
+                    <td className="px-2.5 py-2 text-right tabular-nums font-bold text-gray-800">{fmt(sum('spayTypist'))}</td>
                     <td className="px-2.5 py-2 text-right tabular-nums font-bold text-emerald-800 border-r border-gray-200">{fmt(sum('gross'))}</td>
                     <td className="px-2.5 py-2 text-right tabular-nums font-bold text-red-700">{fmt(sum('itDeduction'))}</td>
                     <td className="px-2.5 py-2 text-right tabular-nums font-bold text-red-700">{fmt(sum('ptDeduction'))}</td>
@@ -593,7 +630,7 @@ export default function SalaryGrants() {
                     <td className="px-2.5 py-2 text-right tabular-nums font-bold text-red-700">{fmt(sum('fbf'))}</td>
                     <td className="px-2.5 py-2 text-right tabular-nums font-bold text-red-800 border-r border-gray-200">{fmt(sum('totalDeductions'))}</td>
                     <td className="px-2.5 py-2 text-right tabular-nums font-bold text-teal-800 border-r border-gray-200">{fmt(sum('netSalary'))}</td>
-                    <td className="px-2.5 py-2 text-gray-400" colSpan={5}>—</td>
+                    <td className="px-2.5 py-2 text-gray-400" colSpan={7}>—</td>
                   </tr>
                 </tfoot>
               );

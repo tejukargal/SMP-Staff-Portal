@@ -627,6 +627,9 @@ export default function StaffProfile() {
                             <th className="px-3 py-2.5 text-right font-semibold text-gray-500 whitespace-nowrap">DA</th>
                             <th className="px-3 py-2.5 text-right font-semibold text-gray-500 whitespace-nowrap">HRA</th>
                             <th className="px-3 py-2.5 text-right font-semibold text-gray-500 whitespace-nowrap">IR</th>
+                            <th className="px-3 py-2.5 text-right font-semibold text-gray-500 whitespace-nowrap">SFN</th>
+                            <th className="px-3 py-2.5 text-right font-semibold text-gray-500 whitespace-nowrap">P</th>
+                            <th className="px-3 py-2.5 text-right font-semibold text-gray-500 whitespace-nowrap">SPAY</th>
                             <th className="px-3 py-2.5 text-right font-semibold text-gray-700 whitespace-nowrap bg-sky-50">Gross</th>
                             {/* Deductions */}
                             <th className="px-3 py-2.5 text-right font-semibold text-gray-500 whitespace-nowrap">IT</th>
@@ -647,6 +650,9 @@ export default function StaffProfile() {
                               <td className="px-3 py-2 text-right text-gray-700 tabular-nums">{fmtN(r.daAmount)}</td>
                               <td className="px-3 py-2 text-right text-gray-700 tabular-nums">{fmtN(r.hraAmount)}</td>
                               <td className="px-3 py-2 text-right text-gray-600 tabular-nums">{fmtN(r.ir)}</td>
+                              <td className="px-3 py-2 text-right text-gray-600 tabular-nums">{fmtN(r.sfn ?? 0)}</td>
+                              <td className="px-3 py-2 text-right text-gray-600 tabular-nums">{fmtN(r.p ?? 0)}</td>
+                              <td className="px-3 py-2 text-right text-gray-600 tabular-nums">{fmtN(r.spayTypist ?? 0)}</td>
                               <td className="px-3 py-2 text-right font-semibold text-sky-700 tabular-nums bg-sky-50/40">{fmtN(r.gross)}</td>
                               <td className="px-3 py-2 text-right text-red-500 tabular-nums">{fmtN(r.itDeduction)}</td>
                               <td className="px-3 py-2 text-right text-red-500 tabular-nums">{fmtN(r.ptDeduction)}</td>
@@ -662,11 +668,13 @@ export default function StaffProfile() {
                           const t = salarySlips.reduce((acc, r) => ({
                             basic: acc.basic + r.basicPay, da: acc.da + r.daAmount,
                             hra:   acc.hra   + r.hraAmount, ir: acc.ir + r.ir,
+                            sfn:   acc.sfn   + (r.sfn ?? 0), p: acc.p + (r.p ?? 0),
+                            spay:  acc.spay  + (r.spayTypist ?? 0),
                             gross: acc.gross + r.gross,
                             it:    acc.it    + r.itDeduction, pt: acc.pt + r.ptDeduction,
                             gslic: acc.gslic + r.gslic, lic: acc.lic + r.lic, fbf: acc.fbf + r.fbf,
                             totDed: acc.totDed + r.totalDeductions, net: acc.net + r.netSalary,
-                          }), { basic: 0, da: 0, hra: 0, ir: 0, gross: 0, it: 0, pt: 0, gslic: 0, lic: 0, fbf: 0, totDed: 0, net: 0 });
+                          }), { basic: 0, da: 0, hra: 0, ir: 0, sfn: 0, p: 0, spay: 0, gross: 0, it: 0, pt: 0, gslic: 0, lic: 0, fbf: 0, totDed: 0, net: 0 });
                           return (
                             <tfoot>
                               <tr className="bg-gray-100 border-t-2 border-gray-300">
@@ -675,6 +683,9 @@ export default function StaffProfile() {
                                 <td className="px-3 py-2.5 text-right text-xs font-bold text-gray-700 tabular-nums">{fmtN(t.da)}</td>
                                 <td className="px-3 py-2.5 text-right text-xs font-bold text-gray-700 tabular-nums">{fmtN(t.hra)}</td>
                                 <td className="px-3 py-2.5 text-right text-xs font-bold text-gray-700 tabular-nums">{fmtN(t.ir)}</td>
+                                <td className="px-3 py-2.5 text-right text-xs font-bold text-gray-700 tabular-nums">{fmtN(t.sfn)}</td>
+                                <td className="px-3 py-2.5 text-right text-xs font-bold text-gray-700 tabular-nums">{fmtN(t.p)}</td>
+                                <td className="px-3 py-2.5 text-right text-xs font-bold text-gray-700 tabular-nums">{fmtN(t.spay)}</td>
                                 <td className="px-3 py-2.5 text-right text-xs font-bold text-sky-700  tabular-nums">{fmtN(t.gross)}</td>
                                 <td className="px-3 py-2.5 text-right text-xs font-bold text-red-600  tabular-nums">{fmtN(t.it)}</td>
                                 <td className="px-3 py-2.5 text-right text-xs font-bold text-red-600  tabular-nums">{fmtN(t.pt)}</td>

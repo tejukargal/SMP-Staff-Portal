@@ -240,8 +240,8 @@ function ImportPanel({ open, onClose, staffList, user, existingMonthYears, onImp
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      {['Status','Emp ID','Name','Month/Year','Basic','DA','HRA','Gross','Deductions','Net','Bank A/C'].map((h) => (
-                        <th key={h} className={`px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap ${['Basic','DA','HRA','Gross','Deductions','Net','Bank A/C'].includes(h) ? 'text-right' : 'text-left'}`}>{h}</th>
+                      {['Status','Emp ID','Name','Month/Year','Basic','DA','HRA','IR','SFN','P','SPAY','Gross','Deductions','Net','Bank A/C'].map((h) => (
+                        <th key={h} className={`px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap ${['Basic','DA','HRA','IR','SFN','P','SPAY','Gross','Deductions','Net','Bank A/C'].includes(h) ? 'text-right' : 'text-left'}`}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -259,6 +259,10 @@ function ImportPanel({ open, onClose, staffList, user, existingMonthYears, onImp
                         <td className="px-3 py-2 text-right text-gray-700">{fmt(slip.basicPay)}</td>
                         <td className="px-3 py-2 text-right text-gray-700">{fmt(slip.daAmount)}</td>
                         <td className="px-3 py-2 text-right text-gray-700">{fmt(slip.hraAmount)}</td>
+                        <td className="px-3 py-2 text-right text-gray-700">{fmt(slip.ir)}</td>
+                        <td className="px-3 py-2 text-right text-gray-700">{fmt(slip.sfn)}</td>
+                        <td className="px-3 py-2 text-right text-gray-700">{fmt(slip.p)}</td>
+                        <td className="px-3 py-2 text-right text-gray-700">{fmt(slip.spayTypist)}</td>
                         <td className="px-3 py-2 text-right font-semibold text-gray-800">{fmt(slip.gross)}</td>
                         <td className="px-3 py-2 text-right text-red-600">{fmt(slip.totalDeductions)}</td>
                         <td className="px-3 py-2 text-right font-semibold text-green-700">{fmt(slip.netSalary)}</td>
@@ -390,6 +394,9 @@ export default function SalaryRecords() {
     daAmount:        filtered.reduce((s, r) => s + r.daAmount, 0),
     hraAmount:       filtered.reduce((s, r) => s + r.hraAmount, 0),
     ir:              filtered.reduce((s, r) => s + r.ir, 0),
+    sfn:             filtered.reduce((s, r) => s + (r.sfn ?? 0), 0),
+    p:               filtered.reduce((s, r) => s + (r.p ?? 0), 0),
+    spayTypist:      filtered.reduce((s, r) => s + (r.spayTypist ?? 0), 0),
     gross:           filtered.reduce((s, r) => s + r.gross, 0),
     itDeduction:     filtered.reduce((s, r) => s + r.itDeduction, 0),
     ptDeduction:     filtered.reduce((s, r) => s + r.ptDeduction, 0),
@@ -454,8 +461,8 @@ export default function SalaryRecords() {
   const [showInfoCols, setShowInfoCols] = useState(false);
 
   // Table column definitions
-  const COL_HEADERS = ['Emp ID','Name','Dept','Type','Status','Month','Year','Designation','Days','Basic','DA','HRA','IR','Gross','IT','PT','GSLIC','LIC','FBF','Tot. Ded.','Net'];
-  const RIGHT_COLS  = new Set(['Days','Basic','DA','HRA','IR','Gross','IT','PT','GSLIC','LIC','FBF','Tot. Ded.','Net']);
+  const COL_HEADERS = ['Emp ID','Name','Dept','Type','Status','Month','Year','Designation','Days','Basic','DA','HRA','IR','SFN','P','SPAY','Gross','IT','PT','GSLIC','LIC','FBF','Tot. Ded.','Net'];
+  const RIGHT_COLS  = new Set(['Days','Basic','DA','HRA','IR','SFN','P','SPAY','Gross','IT','PT','GSLIC','LIC','FBF','Tot. Ded.','Net']);
   const CENTER_COLS = new Set(['Days']);
   const HIDDEN_COLS = new Set(['Dept','Type','Status','Designation','Days']);
   // colSpan for the footer label cell: 4 visible (Emp ID, Name, Month, Year) or 9 when info cols shown
@@ -609,6 +616,9 @@ export default function SalaryRecords() {
                     <td className="px-3 py-2 text-right text-gray-700">{fmt(r.daAmount)}</td>
                     <td className="px-3 py-2 text-right text-gray-700">{fmt(r.hraAmount)}</td>
                     <td className="px-3 py-2 text-right text-gray-600">{fmt(r.ir)}</td>
+                    <td className="px-3 py-2 text-right text-gray-600">{fmt(r.sfn ?? 0)}</td>
+                    <td className="px-3 py-2 text-right text-gray-600">{fmt(r.p ?? 0)}</td>
+                    <td className="px-3 py-2 text-right text-gray-600">{fmt(r.spayTypist ?? 0)}</td>
                     <td className="px-3 py-2 text-right font-semibold text-gray-800">{fmt(r.gross)}</td>
                     <td className="px-3 py-2 text-right text-red-600">{fmt(r.itDeduction)}</td>
                     <td className="px-3 py-2 text-right text-red-600">{fmt(r.ptDeduction)}</td>
@@ -631,6 +641,9 @@ export default function SalaryRecords() {
                 <td className="px-3 py-2.5 text-right text-xs font-bold text-gray-800">{fmt(totals.daAmount)}</td>
                 <td className="px-3 py-2.5 text-right text-xs font-bold text-gray-800">{fmt(totals.hraAmount)}</td>
                 <td className="px-3 py-2.5 text-right text-xs font-bold text-gray-800">{fmt(totals.ir)}</td>
+                <td className="px-3 py-2.5 text-right text-xs font-bold text-gray-800">{fmt(totals.sfn)}</td>
+                <td className="px-3 py-2.5 text-right text-xs font-bold text-gray-800">{fmt(totals.p)}</td>
+                <td className="px-3 py-2.5 text-right text-xs font-bold text-gray-800">{fmt(totals.spayTypist)}</td>
                 <td className="px-3 py-2.5 text-right text-xs font-bold text-gray-800">{fmt(totals.gross)}</td>
                 <td className="px-3 py-2.5 text-right text-xs font-bold text-red-700">{fmt(totals.itDeduction)}</td>
                 <td className="px-3 py-2.5 text-right text-xs font-bold text-red-700">{fmt(totals.ptDeduction)}</td>
