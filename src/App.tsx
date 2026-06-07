@@ -11,6 +11,7 @@ import LeaveRecords from '@/pages/LeaveRecords';
 import LicPolicies from '@/pages/LicPolicies';
 import Settings from '@/pages/Settings';
 import VacancyRegister from '@/pages/VacancyRegister';
+import SalaryRecords from '@/pages/SalaryRecords';
 
 export default function App() {
   return (
@@ -33,6 +34,7 @@ export default function App() {
             <Route path="/staff/:id/edit" element={<StaffForm />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/vacancy-register" element={<VacancyRegister />} />
+            <Route path="/salary-records" element={<SalaryRecords />} />
           </Route>
         </Route>
 

@@ -170,3 +170,36 @@ export interface SalaryRow {
   otherDed: number;
   net: number;
 }
+
+export interface SalarySlip {
+  id?: string;
+  staffId: string;
+  empId: string;
+  staffName: string;
+  month: string;
+  year: number;
+  monthYear: string;
+  designation: string;
+  payScale: string;
+  ddoCode: string;
+  daysWorked: number;
+  group: string;
+  nextIncrementDate: string;
+  basicPay: number;
+  daAmount: number;
+  hraAmount: number;
+  ir: number;
+  sfn: number;
+  spayTypist: number;
+  gross: number;
+  itDeduction: number;
+  ptDeduction: number;
+  gslic: number;
+  lic: number;
+  fbf: number;
+  totalDeductions: number;
+  netSalary: number;
+  bankAccount: string;
+  importedAt: Timestamp;
+  importedBy: string;
+}

@@ -11,14 +11,16 @@ import {
   deleteDoc,
   query,
   orderBy,
+  where,
   serverTimestamp,
   writeBatch,
+  Timestamp,
   enableIndexedDbPersistence,
   type DocumentData,
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { app } from './config';
-import type { StaffRecord, UserRecord, LeaveBalance, LeaveRecord, LicPolicy, SanctionedPost, VacancyEvent } from '@/types';
+import type { StaffRecord, UserRecord, LeaveBalance, LeaveRecord, LicPolicy, SanctionedPost, VacancyEvent, SalarySlip } from '@/types';
 
 export const db = getFirestore(app);
 
@@ -338,3 +340,47 @@ export async function fillVacancyEvent(
   }
   return null;
 }
+
+// ── Salary Slips ────────────────────────────────────────────────────────
+
+export async function importSalarySlips(slips: Omit<SalarySlip, 'id'>[]): Promise<void> {
+  const CHUNK = 450;
+  for (let i = 0; i < slips.length; i += CHUNK) {
+    const batch = writeBatch(db);
+    slips.slice(i, i + CHUNK).forEach((slip) => {
+      const docId = `${slip.empId}_${slip.month}_${slip.year}`;
+      batch.set(doc(db, 'salarySlips', docId), slip);
+    });
+    await batch.commit();
+  }
+}
+
+export async function getAllSalarySlips(): Promise<SalarySlip[]> {
+  const snap = await getDocs(collection(db, 'salarySlips'));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as SalarySlip));
+}
+
+export async function getSalarySlipsByMonth(month: string, year: number): Promise<SalarySlip[]> {
+  const q = query(
+    collection(db, 'salarySlips'),
+    where('monthYear', '==', `${month}_${year}`),
+  );
+  const snap = await getDocs(q);
+  const slips = snap.docs.map((d) => ({ id: d.id, ...d.data() } as SalarySlip));
+  return slips.sort((a, b) => a.staffName.localeCompare(b.staffName));
+}
+
+export async function deleteSalarySlipsForMonth(month: string, year: number): Promise<number> {
+  const slips = await getSalarySlipsByMonth(month, year);
+  const CHUNK = 450;
+  let deleted = 0;
+  for (let i = 0; i < slips.length; i += CHUNK) {
+    const batch = writeBatch(db);
+    slips.slice(i, i + CHUNK).forEach((s) => batch.delete(doc(db, 'salarySlips', s.id!)));
+    await batch.commit();
+    deleted += Math.min(CHUNK, slips.length - i);
+  }
+  return deleted;
+}
+
+export { Timestamp };
