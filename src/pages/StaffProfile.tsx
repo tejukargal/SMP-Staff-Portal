@@ -614,10 +614,9 @@ export default function StaffProfile() {
                     No salary records found for this staff member
                   </p>
                 ) : (
-                  <div className="rounded-xl border border-gray-100 overflow-hidden">
-                    <div className="overflow-x-auto">
+                  <div className="rounded-xl border border-gray-100 overflow-auto max-h-[420px]">
                       <table className="w-full text-xs border-collapse">
-                        <thead>
+                        <thead className="sticky top-0 z-10">
                           <tr className="bg-gray-50 border-b border-gray-200">
                             {/* Time */}
                             <th className="px-3 py-2.5 text-left font-semibold text-gray-500 whitespace-nowrap">Month</th>
@@ -676,7 +675,7 @@ export default function StaffProfile() {
                             totDed: acc.totDed + r.totalDeductions, net: acc.net + r.netSalary,
                           }), { basic: 0, da: 0, hra: 0, ir: 0, sfn: 0, p: 0, spay: 0, gross: 0, it: 0, pt: 0, gslic: 0, lic: 0, fbf: 0, totDed: 0, net: 0 });
                           return (
-                            <tfoot>
+                            <tfoot className="sticky bottom-0 z-10">
                               <tr className="bg-gray-100 border-t-2 border-gray-300">
                                 <td colSpan={2} className="px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total</td>
                                 <td className="px-3 py-2.5 text-right text-xs font-bold text-gray-700 tabular-nums">{fmtN(t.basic)}</td>
@@ -699,7 +698,6 @@ export default function StaffProfile() {
                           );
                         })()}
                       </table>
-                    </div>
                   </div>
                 )}
               </div>
