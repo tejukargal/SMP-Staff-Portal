@@ -171,6 +171,33 @@ export interface SalaryRow {
   net: number;
 }
 
+export interface SalaryGrant {
+  id?: string;
+  month: string;
+  year: number;
+  monthYear: string;
+  staffCount: number;
+  basicPay: number;
+  daAmount: number;
+  hraAmount: number;
+  ir: number;
+  sfn: number;
+  gross: number;
+  itDeduction: number;
+  ptDeduction: number;
+  gslic: number;
+  lic: number;
+  fbf: number;
+  totalDeductions: number;
+  netSalary: number;
+  grantsOrderNo: string;
+  grantsReceivedGross: number;
+  salaryCreditedDate: string;
+  deductionsReceivedDate: string;
+  updatedAt?: Timestamp;
+  updatedBy?: string;
+}
+
 export interface SalarySlip {
   id?: string;
   staffId: string;

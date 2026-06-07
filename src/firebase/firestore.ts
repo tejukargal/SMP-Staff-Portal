@@ -20,7 +20,7 @@ import {
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { app } from './config';
-import type { StaffRecord, UserRecord, LeaveBalance, LeaveRecord, LicPolicy, SanctionedPost, VacancyEvent, SalarySlip } from '@/types';
+import type { StaffRecord, UserRecord, LeaveBalance, LeaveRecord, LicPolicy, SanctionedPost, VacancyEvent, SalarySlip, SalaryGrant } from '@/types';
 
 export const db = getFirestore(app);
 
@@ -370,6 +370,30 @@ export async function getSalarySlipsByMonth(month: string, year: number): Promis
   return slips.sort((a, b) => a.staffName.localeCompare(b.staffName));
 }
 
+export async function getSalarySlipsByStaff(staffId: string, empId: string): Promise<SalarySlip[]> {
+  // Salary slips may have been imported as unmatched (staffId='') or with a different empId format.
+  // Run both a staffId query and an empId query in parallel and merge to cover all cases.
+  const norm = empId.replace(/^0+/, '') || empId;
+  const variants = [...new Set([empId, norm, '0' + norm])];
+
+  const [byStaffId, byEmpId] = await Promise.all([
+    getDocs(query(collection(db, 'salarySlips'), where('staffId', '==', staffId))),
+    getDocs(query(collection(db, 'salarySlips'), where('empId', 'in', variants))),
+  ]);
+
+  const seen = new Set<string>();
+  const results: SalarySlip[] = [];
+  for (const snap of [byStaffId, byEmpId]) {
+    for (const d of snap.docs) {
+      if (!seen.has(d.id)) {
+        seen.add(d.id);
+        results.push({ id: d.id, ...d.data() } as SalarySlip);
+      }
+    }
+  }
+  return results;
+}
+
 export async function deleteSalarySlipsForMonth(month: string, year: number): Promise<number> {
   const slips = await getSalarySlipsByMonth(month, year);
   const CHUNK = 450;
@@ -381,6 +405,24 @@ export async function deleteSalarySlipsForMonth(month: string, year: number): Pr
     deleted += Math.min(CHUNK, slips.length - i);
   }
   return deleted;
+}
+
+// ── Salary Grants ────────────────────────────────────────────────────────────
+
+export async function getAllSalaryGrants(): Promise<SalaryGrant[]> {
+  const snap = await getDocs(collection(db, 'salaryGrants'));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as SalaryGrant));
+}
+
+export async function upsertSalaryGrant(
+  data: Omit<SalaryGrant, 'id' | 'updatedAt' | 'updatedBy'>,
+  updatedBy: string,
+): Promise<void> {
+  await setDoc(doc(db, 'salaryGrants', data.monthYear), {
+    ...data,
+    updatedBy,
+    updatedAt: serverTimestamp(),
+  });
 }
 
 export { Timestamp };

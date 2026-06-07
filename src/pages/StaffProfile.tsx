@@ -10,15 +10,17 @@ import {
   getLeaveBalance,
   getLeaveRecords,
   getLicPolicies,
+  getSalarySlipsByStaff,
 } from '@/firebase/firestore';
 import { formatDate, computeServiceYears, computeDOR, getAge } from '@/utils/dateUtils';
 import { formatINR } from '@/utils/salaryUtils';
 import { LEAVE_COLORS, fmtDate } from '@/components/staff/LeaveModal';
-import type { StaffRecord, LeaveBalance, LeaveRecord, LicPolicy, StatusEnum } from '@/types';
+import { MONTHS } from '@/constants/enums';
+import type { StaffRecord, LeaveBalance, LeaveRecord, LicPolicy, StatusEnum, SalarySlip } from '@/types';
 
 // ── Types & constants ─────────────────────────────────────────────────────────
 
-type Tab = 'personal' | 'service' | 'financial' | 'leave' | 'lic';
+type Tab = 'personal' | 'service' | 'financial' | 'leave' | 'lic' | 'salary';
 
 const TABS: { key: Tab; label: string; active: string }[] = [
   { key: 'personal',  label: 'Personal',  active: 'border-blue-500   text-blue-600'   },
@@ -26,7 +28,11 @@ const TABS: { key: Tab; label: string; active: string }[] = [
   { key: 'financial', label: 'Financial', active: 'border-violet-500 text-violet-600' },
   { key: 'leave',     label: 'Leave',     active: 'border-amber-500  text-amber-600'  },
   { key: 'lic',       label: 'LIC',       active: 'border-rose-500   text-rose-600'   },
+  { key: 'salary',    label: 'Salary',    active: 'border-emerald-500 text-emerald-600' },
 ];
+
+const MONTH_IDX = Object.fromEntries(MONTHS.map((m, i) => [m, i]));
+function fmtN(n: number) { return n ? n.toLocaleString('en-IN') : '—'; }
 
 const STATUS_GRADIENT: Record<StatusEnum, string> = {
   'IN SERVICE':  'from-emerald-700 to-teal-900',
@@ -116,6 +122,8 @@ export default function StaffProfile() {
   const [leaveLoading, setLeaveLoading] = useState(false);
   const [licPolicies, setLicPolicies]   = useState<LicPolicy[] | null>(null);
   const [licLoading, setLicLoading]     = useState(false);
+  const [salarySlips, setSalarySlips]   = useState<SalarySlip[] | null>(null);
+  const [salaryLoading, setSalaryLoading] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -145,7 +153,19 @@ export default function StaffProfile() {
         .catch(() => showToast('error', 'Failed to load LIC policies'))
         .finally(() => setLicLoading(false));
     }
-  }, [activeTab, staff?.id, leaveBalance, leaveLoading, licPolicies, licLoading, showToast]);
+    if (activeTab === 'salary' && salarySlips === null && !salaryLoading) {
+      setSalaryLoading(true);
+      getSalarySlipsByStaff(staff.id, staff.empId ?? '')
+        .then(slips => {
+          const sorted = [...slips].sort((a, b) =>
+            b.year !== a.year ? b.year - a.year : (MONTH_IDX[b.month] ?? 0) - (MONTH_IDX[a.month] ?? 0)
+          );
+          setSalarySlips(sorted);
+        })
+        .catch(() => showToast('error', 'Failed to load salary records'))
+        .finally(() => setSalaryLoading(false));
+    }
+  }, [activeTab, staff?.id, leaveBalance, leaveLoading, licPolicies, licLoading, salarySlips, salaryLoading, showToast]);
 
   if (loading) return <PageSpinner />;
   if (!staff) return (
@@ -552,6 +572,125 @@ export default function StaffProfile() {
                     </div>
                   )}
                 </div>
+              </div>
+            )
+          )}
+
+          {/* ── Salary ───────────────────────────────────────────────── */}
+          {activeTab === 'salary' && (
+            salaryLoading ? (
+              <div className="flex justify-center py-10"><Spinner /></div>
+            ) : (
+              <div className="px-5 py-4 space-y-3">
+
+                {/* Summary chips */}
+                {salarySlips && salarySlips.length > 0 && (() => {
+                  const totalGross = salarySlips.reduce((s, r) => s + r.gross, 0);
+                  const totalNet   = salarySlips.reduce((s, r) => s + r.netSalary, 0);
+                  return (
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3 flex flex-col gap-1">
+                        <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest">Records</span>
+                        <span className="text-2xl font-bold text-emerald-700">{salarySlips.length}</span>
+                        <span className="text-[10px] text-gray-500">months of data</span>
+                      </div>
+                      <div className="rounded-xl border border-sky-100 bg-sky-50 p-3 flex flex-col gap-1">
+                        <span className="text-[9px] font-bold text-sky-500 uppercase tracking-widest">Total Gross</span>
+                        <span className="text-base font-bold text-sky-700 tabular-nums">₹{totalGross.toLocaleString('en-IN')}</span>
+                        <span className="text-[10px] text-gray-500">across all months</span>
+                      </div>
+                      <div className="rounded-xl border border-violet-100 bg-violet-50 p-3 flex flex-col gap-1">
+                        <span className="text-[9px] font-bold text-violet-500 uppercase tracking-widest">Total Net</span>
+                        <span className="text-base font-bold text-violet-700 tabular-nums">₹{totalNet.toLocaleString('en-IN')}</span>
+                        <span className="text-[10px] text-gray-500">after all deductions</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Table */}
+                {!salarySlips || salarySlips.length === 0 ? (
+                  <p className="text-xs text-gray-300 text-center py-8 border border-dashed border-gray-200 rounded-xl">
+                    No salary records found for this staff member
+                  </p>
+                ) : (
+                  <div className="rounded-xl border border-gray-100 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-200">
+                            {/* Time */}
+                            <th className="px-3 py-2.5 text-left font-semibold text-gray-500 whitespace-nowrap">Month</th>
+                            <th className="px-3 py-2.5 text-left font-semibold text-gray-500 whitespace-nowrap">Year</th>
+                            {/* Earnings */}
+                            <th className="px-3 py-2.5 text-right font-semibold text-gray-500 whitespace-nowrap">Basic</th>
+                            <th className="px-3 py-2.5 text-right font-semibold text-gray-500 whitespace-nowrap">DA</th>
+                            <th className="px-3 py-2.5 text-right font-semibold text-gray-500 whitespace-nowrap">HRA</th>
+                            <th className="px-3 py-2.5 text-right font-semibold text-gray-500 whitespace-nowrap">IR</th>
+                            <th className="px-3 py-2.5 text-right font-semibold text-gray-700 whitespace-nowrap bg-sky-50">Gross</th>
+                            {/* Deductions */}
+                            <th className="px-3 py-2.5 text-right font-semibold text-gray-500 whitespace-nowrap">IT</th>
+                            <th className="px-3 py-2.5 text-right font-semibold text-gray-500 whitespace-nowrap">PT</th>
+                            <th className="px-3 py-2.5 text-right font-semibold text-gray-500 whitespace-nowrap">GSLIC</th>
+                            <th className="px-3 py-2.5 text-right font-semibold text-gray-500 whitespace-nowrap">LIC</th>
+                            <th className="px-3 py-2.5 text-right font-semibold text-gray-500 whitespace-nowrap">FBF</th>
+                            <th className="px-3 py-2.5 text-right font-semibold text-red-600  whitespace-nowrap bg-red-50">Tot. Ded.</th>
+                            <th className="px-3 py-2.5 text-right font-semibold text-emerald-700 whitespace-nowrap bg-emerald-50">Net</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {salarySlips.map((r, i) => (
+                            <tr key={r.id} className={`hover:bg-sky-50/40 transition-colors ${i % 2 === 1 ? 'bg-gray-50/40' : ''}`}>
+                              <td className="px-3 py-2 text-gray-700 font-medium whitespace-nowrap">{r.month}</td>
+                              <td className="px-3 py-2 text-gray-600 tabular-nums">{r.year}</td>
+                              <td className="px-3 py-2 text-right text-gray-700 tabular-nums">{fmtN(r.basicPay)}</td>
+                              <td className="px-3 py-2 text-right text-gray-700 tabular-nums">{fmtN(r.daAmount)}</td>
+                              <td className="px-3 py-2 text-right text-gray-700 tabular-nums">{fmtN(r.hraAmount)}</td>
+                              <td className="px-3 py-2 text-right text-gray-600 tabular-nums">{fmtN(r.ir)}</td>
+                              <td className="px-3 py-2 text-right font-semibold text-sky-700 tabular-nums bg-sky-50/40">{fmtN(r.gross)}</td>
+                              <td className="px-3 py-2 text-right text-red-500 tabular-nums">{fmtN(r.itDeduction)}</td>
+                              <td className="px-3 py-2 text-right text-red-500 tabular-nums">{fmtN(r.ptDeduction)}</td>
+                              <td className="px-3 py-2 text-right text-red-500 tabular-nums">{fmtN(r.gslic)}</td>
+                              <td className="px-3 py-2 text-right text-red-500 tabular-nums">{fmtN(r.lic)}</td>
+                              <td className="px-3 py-2 text-right text-red-500 tabular-nums">{fmtN(r.fbf)}</td>
+                              <td className="px-3 py-2 text-right font-semibold text-red-700 tabular-nums bg-red-50/40">{fmtN(r.totalDeductions)}</td>
+                              <td className="px-3 py-2 text-right font-semibold text-emerald-700 tabular-nums bg-emerald-50/40">{fmtN(r.netSalary)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        {salarySlips.length > 1 && (() => {
+                          const t = salarySlips.reduce((acc, r) => ({
+                            basic: acc.basic + r.basicPay, da: acc.da + r.daAmount,
+                            hra:   acc.hra   + r.hraAmount, ir: acc.ir + r.ir,
+                            gross: acc.gross + r.gross,
+                            it:    acc.it    + r.itDeduction, pt: acc.pt + r.ptDeduction,
+                            gslic: acc.gslic + r.gslic, lic: acc.lic + r.lic, fbf: acc.fbf + r.fbf,
+                            totDed: acc.totDed + r.totalDeductions, net: acc.net + r.netSalary,
+                          }), { basic: 0, da: 0, hra: 0, ir: 0, gross: 0, it: 0, pt: 0, gslic: 0, lic: 0, fbf: 0, totDed: 0, net: 0 });
+                          return (
+                            <tfoot>
+                              <tr className="bg-gray-100 border-t-2 border-gray-300">
+                                <td colSpan={2} className="px-3 py-2.5 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total</td>
+                                <td className="px-3 py-2.5 text-right text-xs font-bold text-gray-700 tabular-nums">{fmtN(t.basic)}</td>
+                                <td className="px-3 py-2.5 text-right text-xs font-bold text-gray-700 tabular-nums">{fmtN(t.da)}</td>
+                                <td className="px-3 py-2.5 text-right text-xs font-bold text-gray-700 tabular-nums">{fmtN(t.hra)}</td>
+                                <td className="px-3 py-2.5 text-right text-xs font-bold text-gray-700 tabular-nums">{fmtN(t.ir)}</td>
+                                <td className="px-3 py-2.5 text-right text-xs font-bold text-sky-700  tabular-nums">{fmtN(t.gross)}</td>
+                                <td className="px-3 py-2.5 text-right text-xs font-bold text-red-600  tabular-nums">{fmtN(t.it)}</td>
+                                <td className="px-3 py-2.5 text-right text-xs font-bold text-red-600  tabular-nums">{fmtN(t.pt)}</td>
+                                <td className="px-3 py-2.5 text-right text-xs font-bold text-red-600  tabular-nums">{fmtN(t.gslic)}</td>
+                                <td className="px-3 py-2.5 text-right text-xs font-bold text-red-600  tabular-nums">{fmtN(t.lic)}</td>
+                                <td className="px-3 py-2.5 text-right text-xs font-bold text-red-600  tabular-nums">{fmtN(t.fbf)}</td>
+                                <td className="px-3 py-2.5 text-right text-xs font-bold text-red-700  tabular-nums">{fmtN(t.totDed)}</td>
+                                <td className="px-3 py-2.5 text-right text-xs font-bold text-emerald-700 tabular-nums">{fmtN(t.net)}</td>
+                              </tr>
+                            </tfoot>
+                          );
+                        })()}
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
             )
           )}

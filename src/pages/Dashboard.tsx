@@ -2,7 +2,7 @@ import { useMemo, useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   GraduationCap, Briefcase, UserCheck,
-  Search, Eye, ClipboardList, X,
+  Search, Eye, ClipboardList, X, FileText, Sheet,
 } from 'lucide-react';
 import { useStaff } from '@/hooks/useStaff';
 import { getSanctionedPosts } from '@/firebase/firestore';
@@ -10,6 +10,13 @@ import { PageSpinner } from '@/components/ui/Spinner';
 import { DeptBadge } from '@/components/ui/Badge';
 import { DEPARTMENTS, DESIGNATIONS, DEPT_COLORS, DESIGNATION_ORDER } from '@/constants/enums';
 import type { DeptEnum, StaffRecord, SanctionedPost } from '@/types';
+import {
+  exportVacancyMatrixPdf, exportVacancyMatrixXlsx,
+  exportDeptVacancySummaryPdf, exportDeptVacancySummaryXlsx,
+  exportDesignationBreakdownPdf, exportDesignationBreakdownXlsx,
+  exportDeptCategoryPdf, exportDeptCategoryXlsx,
+  exportCategoryDeptMatrixPdf, exportCategoryDeptMatrixXlsx,
+} from '@/utils/dashboardExport';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -124,6 +131,27 @@ function Td({ children, align = 'left', className = '' }: { children?: React.Rea
 function Num({ v, color }: { v: number; color?: string }) {
   if (!v) return <span className="text-gray-200 font-medium">—</span>;
   return <span className="font-bold tabular-nums" style={{ color: color ?? '#1f2937' }}>{v}</span>;
+}
+
+// ── Export action buttons ─────────────────────────────────────────────────────
+
+function ExportActions({ onPdf, onXls }: { onPdf: () => void; onXls: () => void }) {
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        onClick={onPdf}
+        className="flex items-center gap-1 px-2 py-1 rounded border border-gray-200 text-[10px] font-semibold text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
+      >
+        <FileText className="w-3 h-3" />PDF
+      </button>
+      <button
+        onClick={onXls}
+        className="flex items-center gap-1 px-2 py-1 rounded border border-emerald-200 text-[10px] font-semibold text-emerald-600 hover:bg-emerald-50 transition-colors"
+      >
+        <Sheet className="w-3 h-3" />XLS
+      </button>
+    </div>
+  );
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -618,6 +646,12 @@ export default function Dashboard() {
         title="Dept × Designation Vacancy"
         subtitle="Vacant posts by department and designation"
         delay={320}
+        action={
+          <ExportActions
+            onPdf={() => exportVacancyMatrixPdf(vacancyMatrix, DEPARTMENTS)}
+            onXls={() => exportVacancyMatrixXlsx(vacancyMatrix, DEPARTMENTS)}
+          />
+        }
       >
         <div className="-mx-5 -mb-5 overflow-x-auto">
           <table className="w-full text-xs border-collapse [&_th]:border-r [&_th]:border-gray-100 [&_td]:border-r [&_td]:border-gray-100">
@@ -722,6 +756,26 @@ export default function Dashboard() {
                 </tr>
               )}
 
+              {/* ── Other designations (e.g. English Part Time) ── */}
+              {vacancyMatrix.otherRows.map(({ desig, cells, totVacant }, i) => (
+                <tr key={desig} className="border-b border-gray-100 hover:bg-sky-50/40 transition-colors"
+                  style={{ animation: `content-enter 0.25s ease-out ${460 + i * 25}ms both` }}>
+                  <td className="pl-5 pr-3 py-1.5 text-[13px] font-medium text-gray-700 sticky left-0 bg-white">{desig}</td>
+                  {cells.map((c, di) => (
+                    <td key={di} className="px-3 py-1.5 text-center tabular-nums text-[13px]">
+                      {c.sanctioned === 0
+                        ? <span className="text-gray-200">—</span>
+                        : c.vacant === 0
+                          ? <span className="font-semibold text-green-500">0</span>
+                          : <span className="font-bold text-red-500">{c.vacant}</span>}
+                    </td>
+                  ))}
+                  <td className="px-3 pr-5 py-1.5 text-center tabular-nums text-[13px] font-bold">
+                    {totVacant > 0 ? <span className="text-red-500">{totVacant}</span> : <span className="text-gray-300">0</span>}
+                  </td>
+                </tr>
+              ))}
+
               {/* ── Grand total ── */}
               <tr className="bg-sky-50/70 border-t-2 border-sky-100">
                 <td className="pl-5 pr-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-sky-700 sticky left-0 bg-sky-50/70">Total</td>
@@ -746,7 +800,17 @@ export default function Dashboard() {
       </Panel>
 
       {/* ── Row 4: Dept vacancy summary table ────────────────────────────── */}
-      <Panel title="Department Vacancy Summary" subtitle="Sanctioned vs filled vs vacant · Teaching / Non-Teaching" delay={480}>
+      <Panel
+        title="Department Vacancy Summary"
+        subtitle="Sanctioned vs filled vs vacant · Teaching / Non-Teaching"
+        delay={480}
+        action={
+          <ExportActions
+            onPdf={() => exportDeptVacancySummaryPdf(deptVacancyStats, { totalSanctioned, totalFilled, totalVacant })}
+            onXls={() => exportDeptVacancySummaryXlsx(deptVacancyStats, { totalSanctioned, totalFilled, totalVacant })}
+          />
+        }
+      >
         <div className="overflow-x-auto -mx-5 -mb-5">
           <table className="w-full text-sm border-collapse [&_th]:border-r [&_th]:border-gray-100 [&_td]:border-r [&_td]:border-gray-100">
             <thead>
@@ -810,7 +874,18 @@ export default function Dashboard() {
       <div className="grid grid-cols-3 gap-4">
 
         {/* Designation breakdown */}
-        <Panel title="By Designation" subtitle="In-service only" delay={560} className="h-full flex flex-col">
+        <Panel
+          title="By Designation"
+          subtitle="In-service only"
+          delay={560}
+          className="h-full flex flex-col"
+          action={
+            <ExportActions
+              onPdf={() => exportDesignationBreakdownPdf(designationBreakdown, designationTotal)}
+              onXls={() => exportDesignationBreakdownXlsx(designationBreakdown, designationTotal)}
+            />
+          }
+        >
           {designationBreakdown.length === 0
             ? <p className="text-sm text-gray-300">No data yet</p>
             : (
@@ -844,7 +919,18 @@ export default function Dashboard() {
         </Panel>
 
         {/* Dept × category table */}
-        <Panel title="Department × Category" subtitle="In-service · Teaching vs Non-Teaching" delay={580} className="col-span-2">
+        <Panel
+          title="Department × Category"
+          subtitle="In-service · Teaching vs Non-Teaching"
+          delay={580}
+          className="col-span-2"
+          action={
+            <ExportActions
+              onPdf={() => exportDeptCategoryPdf(categoryStats, { tInSvc: categoryTotals.tInSvc, ntInSvc: categoryTotals.ntInSvc })}
+              onXls={() => exportDeptCategoryXlsx(categoryStats, { tInSvc: categoryTotals.tInSvc, ntInSvc: categoryTotals.ntInSvc })}
+            />
+          }
+        >
           <div className="overflow-x-auto -mx-5 -mb-5">
             <table className="w-full text-sm">
               <thead>
@@ -882,7 +968,17 @@ export default function Dashboard() {
       </div>
 
       {/* ── Row 6: Category × Dept matrix ───────────────────────────────── */}
-      <Panel title="Category-wise Staff Count" subtitle="In-service staff by category and department" delay={640}>
+      <Panel
+        title="Category-wise Staff Count"
+        subtitle="In-service staff by category and department"
+        delay={640}
+        action={
+          <ExportActions
+            onPdf={() => exportCategoryDeptMatrixPdf(catDeptRows, catDeptColTotals, catDeptGrandTotal, DEPARTMENTS)}
+            onXls={() => exportCategoryDeptMatrixXlsx(catDeptRows, catDeptColTotals, catDeptGrandTotal, DEPARTMENTS)}
+          />
+        }
+      >
         <div className="overflow-x-auto -mx-5 -mb-5">
           <table className="w-full text-sm border-collapse [&_th]:border-r [&_th]:border-gray-100 [&_td]:border-r [&_td]:border-gray-100">
             <thead>

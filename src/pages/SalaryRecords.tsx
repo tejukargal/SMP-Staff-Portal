@@ -53,7 +53,7 @@ function FilterSelect({ label, value, onChange, options }: {
 }) {
   return (
     <select value={value} onChange={(e) => onChange(e.target.value)}
-      className="cursor-pointer text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white text-gray-700 transition-colors hover:border-sky-300">
+      className="cursor-pointer text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white text-gray-700 transition-colors hover:border-sky-300 shrink-0">
       <option value="">{label}</option>
       {options.map((o) => <option key={o} value={o}>{o}</option>)}
     </select>
@@ -451,58 +451,81 @@ export default function SalaryRecords() {
   const oldestShownLabel = monthYearOptions.slice(-visibleMonthCount)[0]?.label ?? '';
   const uniqueStaff = new Set(allSlips.map((s) => normEmpId(s.empId))).size;
 
+  const [showInfoCols, setShowInfoCols] = useState(false);
+
   // Table column definitions
   const COL_HEADERS = ['Emp ID','Name','Dept','Type','Status','Month','Year','Designation','Days','Basic','DA','HRA','IR','Gross','IT','PT','GSLIC','LIC','FBF','Tot. Ded.','Net'];
   const RIGHT_COLS  = new Set(['Days','Basic','DA','HRA','IR','Gross','IT','PT','GSLIC','LIC','FBF','Tot. Ded.','Net']);
   const CENTER_COLS = new Set(['Days']);
+  const HIDDEN_COLS = new Set(['Dept','Type','Status','Designation','Days']);
+  // colSpan for the footer label cell: 4 visible (Emp ID, Name, Month, Year) or 9 when info cols shown
+  const footerLabelSpan = showInfoCols ? 9 : 4;
+  const ic = !showInfoCols ? 'hidden' : ''; // class for info-only columns
 
   return (
-    <div className="h-full flex flex-col gap-3">
+    <div className="h-full flex flex-col gap-3" style={{ animation: 'page-enter 0.35s ease-out' }}>
 
-      {/* ── Row 1: Search + Actions ── */}
-      <div className="flex-shrink-0 flex items-center justify-between gap-3 flex-wrap">
-        <div className="relative">
+      {/* ── Toolbar + Stats grouped tightly ── */}
+      <div className="flex-shrink-0 flex flex-col gap-1">
+
+      {/* Toolbar: Search + Filters + Actions */}
+      <div className="flex items-start gap-1.5">
+        {/* Search */}
+        <div className="relative shrink-0">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-          <input type="text" placeholder="Search name or emp ID…" value={search}
+          <input type="text" placeholder="Search name or ID…" value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white w-56 cursor-text" />
+            className="pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white w-40 cursor-text" />
         </div>
-        <div className="flex gap-2 shrink-0">
-          <Button variant="secondary" size="sm" onClick={handleExport} disabled={!filtered.length}>
-            <Download className="w-3.5 h-3.5" /> Export Excel
-          </Button>
-          <Button size="sm" onClick={() => setImportOpen(true)}>
-            <UploadCloud className="w-3.5 h-3.5" /> Import Salary
-          </Button>
-        </div>
-      </div>
 
-      {/* ── Row 2: Filters ── */}
-      <div className="flex-shrink-0 flex items-center gap-2 flex-wrap">
-        <FilterSelect label="All Months"  value={filterMonth}  onChange={(v) => { setFilterMonth(v);  setVisibleMonthCount(1); }} options={uniqueMonths} />
-        <FilterSelect label="All Years"   value={filterYear}   onChange={(v) => { setFilterYear(v);   setVisibleMonthCount(1); }} options={uniqueYears} />
-        <FilterSelect label="All Depts"   value={filterDept}   onChange={setFilterDept}   options={filterOptions.depts} />
-        <FilterSelect label="All Types"   value={filterType}   onChange={setFilterType}   options={filterOptions.types} />
-        <FilterSelect label="All Status"  value={filterStatus} onChange={setFilterStatus} options={filterOptions.statuses} />
-        <FilterSelect label="All Desig."  value={filterDesig}  onChange={setFilterDesig}  options={filterOptions.desigs} />
+        <div className="w-px self-stretch bg-gray-200 shrink-0 my-0.5" />
+
+        {/* Filters */}
+        <FilterSelect label="Month"  value={filterMonth}  onChange={(v) => { setFilterMonth(v);  setVisibleMonthCount(1); }} options={uniqueMonths} />
+        <FilterSelect label="Year"   value={filterYear}   onChange={(v) => { setFilterYear(v);   setVisibleMonthCount(1); }} options={uniqueYears} />
+        <FilterSelect label="Dept"   value={filterDept}   onChange={setFilterDept}   options={filterOptions.depts} />
+        <FilterSelect label="Type"   value={filterType}   onChange={setFilterType}   options={filterOptions.types} />
+        <FilterSelect label="Status" value={filterStatus} onChange={setFilterStatus} options={filterOptions.statuses} />
+        <FilterSelect label="Desig." value={filterDesig}  onChange={setFilterDesig}  options={filterOptions.desigs} />
 
         {anyFilterActive && (
           <button onClick={clearFilters}
-            className="cursor-pointer inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-red-600 border border-gray-200 hover:border-red-300 rounded-lg px-2.5 py-1.5 bg-white transition-colors">
+            className="cursor-pointer inline-flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-red-600 border border-gray-200 hover:border-red-300 rounded-lg px-2 py-1.5 bg-white transition-colors shrink-0">
             <X className="w-3 h-3" /> Clear
           </button>
         )}
 
         {filterMonth && filterYear && (
-          <Button variant="danger" size="sm"
-            onClick={() => setDeleteTarget({ month: filterMonth, year: parseInt(filterYear) })}>
-            <Trash2 className="w-3.5 h-3.5" /> Delete {filterMonth} {filterYear}
+          <Button variant="danger" size="sm" onClick={() => setDeleteTarget({ month: filterMonth, year: parseInt(filterYear) })}>
+            <Trash2 className="w-3.5 h-3.5" /> Delete
           </Button>
         )}
+
+        {/* Push actions to the right */}
+        <div className="flex-1" />
+
+        <div className="flex flex-col items-end gap-0.5 shrink-0">
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm" onClick={handleExport} disabled={!filtered.length}>
+              <Download className="w-3.5 h-3.5" /> Export Excel
+            </Button>
+            <Button size="sm" onClick={() => setImportOpen(true)}>
+              <UploadCloud className="w-3.5 h-3.5" /> Import Salary
+            </Button>
+          </div>
+          <button
+            onClick={() => setShowInfoCols(v => !v)}
+            className="inline-flex items-center gap-1 text-[10px] font-medium text-gray-400 hover:text-sky-600 transition-colors self-end"
+          >
+            {showInfoCols
+              ? <><EyeOff className="w-3 h-3" /> Hide info columns</>
+              : <><Eye className="w-3 h-3" /> Show info columns</>}
+          </button>
+        </div>
       </div>
 
-      {/* ── Stats bar ── */}
-      <div className="flex-shrink-0 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+      {/* Stats bar */}
+      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
         {([
           { label: 'Showing', value: filtered.length, unit: 'records', accent: 'text-sky-500' },
           'sep',
@@ -528,6 +551,8 @@ export default function SalaryRecords() {
         )}
       </div>
 
+      </div>{/* end toolbar+stats group */}
+
       {/* ── Table ── */}
       <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-gray-200 bg-white">
         {loading ? (
@@ -548,37 +573,38 @@ export default function SalaryRecords() {
             <thead className="sticky top-0 z-10">
               <tr className="bg-gray-50 border-b border-gray-200">
                 {COL_HEADERS.map((h) => (
-                  <th key={h} className={`px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap ${CENTER_COLS.has(h) ? 'text-center' : RIGHT_COLS.has(h) ? 'text-right' : 'text-left'}`}>{h}</th>
+                  <th key={h} className={`px-3 py-2.5 font-semibold text-gray-600 whitespace-nowrap ${CENTER_COLS.has(h) ? 'text-center' : RIGHT_COLS.has(h) ? 'text-right' : 'text-left'} ${HIDDEN_COLS.has(h) ? ic : ''}`}>{h}</th>
                 ))}
               </tr>
             </thead>
 
             <tbody className="divide-y divide-gray-100">
-              {filtered.map((r) => {
+              {filtered.map((r, rowIdx) => {
                 const stf = empStaffMap.get(normEmpId(r.empId));
                 return (
-                  <tr key={r.id} className="hover:bg-sky-50/40 transition-colors">
+                  <tr key={r.id} className="hover:bg-sky-50/40 transition-colors"
+                    style={{ animation: 'content-enter 0.25s ease-out both', animationDelay: `${Math.min(rowIdx * 0.018, 0.28)}s` }}>
                     <td className="px-3 py-2 font-mono text-gray-600 whitespace-nowrap">{r.empId}</td>
                     <td className="px-3 py-2 font-medium text-gray-800 whitespace-nowrap">{r.staffName || <span className="text-gray-400 italic">—</span>}</td>
-                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                    <td className={`px-3 py-2 text-gray-600 whitespace-nowrap ${ic}`}>
                       {stf?.dept
                         ? <span className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-100">{stf.dept}</span>
                         : <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                    <td className={`px-3 py-2 text-gray-600 whitespace-nowrap ${ic}`}>
                       {stf?.type
                         ? <span className={`inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full border ${stf.type === 'TEACHING' ? 'bg-purple-50 text-purple-700 border-purple-100' : 'bg-orange-50 text-orange-700 border-orange-100'}`}>{stf.type === 'TEACHING' ? 'Teaching' : 'Non-Teaching'}</span>
                         : <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="px-3 py-2 whitespace-nowrap">
+                    <td className={`px-3 py-2 whitespace-nowrap ${ic}`}>
                       {stf?.status
                         ? <span className={`inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full border ${stf.status === 'IN SERVICE' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-gray-100 text-gray-500 border-gray-200'}`}>{stf.status}</span>
                         : <span className="text-gray-300">—</span>}
                     </td>
                     <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{r.month}</td>
                     <td className="px-3 py-2 text-gray-600">{r.year}</td>
-                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{r.designation || stf?.designation || <span className="text-gray-300">—</span>}</td>
-                    <td className="px-3 py-2 text-center text-gray-600">{r.daysWorked || '—'}</td>
+                    <td className={`px-3 py-2 text-gray-600 whitespace-nowrap ${ic}`}>{r.designation || stf?.designation || <span className="text-gray-300">—</span>}</td>
+                    <td className={`px-3 py-2 text-center text-gray-600 ${ic}`}>{r.daysWorked || '—'}</td>
                     <td className="px-3 py-2 text-right text-gray-700">{fmt(r.basicPay)}</td>
                     <td className="px-3 py-2 text-right text-gray-700">{fmt(r.daAmount)}</td>
                     <td className="px-3 py-2 text-right text-gray-700">{fmt(r.hraAmount)}</td>
@@ -598,7 +624,7 @@ export default function SalaryRecords() {
 
             <tfoot className="sticky bottom-0 z-10">
               <tr className="bg-gray-100 border-t-2 border-gray-300">
-                <td colSpan={9} className="px-3 py-2.5 text-xs font-semibold text-gray-600 whitespace-nowrap">
+                <td colSpan={footerLabelSpan} className="px-3 py-2.5 text-xs font-semibold text-gray-600 whitespace-nowrap">
                   TOTAL — {filtered.length} record{filtered.length !== 1 ? 's' : ''}
                 </td>
                 <td className="px-3 py-2.5 text-right text-xs font-bold text-gray-800">{fmt(totals.basicPay)}</td>
@@ -619,18 +645,20 @@ export default function SalaryRecords() {
         )}
       </div>
 
-      {/* ── Load More ── */}
-      {canLoadMore && (
-        <div className="flex-shrink-0 flex items-center justify-center gap-3 py-0.5">
-          <span className="text-xs text-gray-400">
-            Showing from <strong>{oldestShownLabel}</strong> · {monthYearOptions.length - visibleMonthCount} older month{monthYearOptions.length - visibleMonthCount !== 1 ? 's' : ''} not loaded
-          </span>
-          <button onClick={() => setVisibleMonthCount((c) => c + 1)}
-            className="cursor-pointer inline-flex items-center gap-1 text-xs font-medium text-sky-600 hover:text-sky-800 border border-sky-200 hover:border-sky-400 rounded-full px-3 py-1 transition-colors bg-white">
-            <ChevronDown className="w-3 h-3" /> Load More
-          </button>
-        </div>
-      )}
+      {/* ── Load More — always occupies same height to prevent table resize ── */}
+      <div className="flex-shrink-0 h-6 flex items-center justify-center gap-3">
+        {canLoadMore && (
+          <>
+            <span className="text-xs text-gray-400">
+              Showing from <strong>{oldestShownLabel}</strong> · {monthYearOptions.length - visibleMonthCount} older month{monthYearOptions.length - visibleMonthCount !== 1 ? 's' : ''} not loaded
+            </span>
+            <button onClick={() => setVisibleMonthCount((c) => c + 1)}
+              className="cursor-pointer inline-flex items-center gap-1 text-xs font-medium text-sky-600 hover:text-sky-800 border border-sky-200 hover:border-sky-400 rounded-full px-3 py-1 transition-colors bg-white">
+              <ChevronDown className="w-3 h-3" /> Load More
+            </button>
+          </>
+        )}
+      </div>
 
       <ImportPanel open={importOpen} onClose={() => setImportOpen(false)}
         staffList={staff} user={user} existingMonthYears={existingMonthYears} onImported={loadAll} />

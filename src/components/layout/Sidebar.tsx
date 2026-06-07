@@ -1,7 +1,7 @@
 import type React from 'react';
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, FileText, CalendarDays, ShieldCheck, Settings, ChevronLeft, ClipboardList, ReceiptText } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, CalendarDays, ShieldCheck, Settings, ChevronLeft, ClipboardList, ReceiptText, IndianRupee } from 'lucide-react';
 import { useRole } from '@/hooks/useRole';
 
 interface SidebarProps {
@@ -16,6 +16,7 @@ const NAV = [
   { to: '/leave-records', label: 'Leave Records', icon: CalendarDays },
   { to: '/lic-policies',      label: 'LIC Policies',     icon: ShieldCheck },
   { to: '/salary-records',    label: 'Salary Records',   icon: ReceiptText,   adminOnly: true },
+  { to: '/salary-grants',     label: 'Salary Grants',    icon: IndianRupee,   adminOnly: true },
   { to: '/vacancy-register',  label: 'Vacancy Register', icon: ClipboardList, adminOnly: true },
   { to: '/settings',          label: 'Settings',         icon: Settings, adminOnly: true },
 ];
