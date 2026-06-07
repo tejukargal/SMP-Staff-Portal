@@ -153,7 +153,7 @@ export default function StaffProfile() {
         .catch(() => showToast('error', 'Failed to load LIC policies'))
         .finally(() => setLicLoading(false));
     }
-    if (activeTab === 'salary' && salarySlips === null && !salaryLoading) {
+    if ((activeTab === 'salary' || activeTab === 'financial') && salarySlips === null && !salaryLoading) {
       setSalaryLoading(true);
       getSalarySlipsByStaff(staff.id, staff.empId ?? '')
         .then(slips => {
@@ -375,18 +375,75 @@ export default function StaffProfile() {
           {/* ── Financial ────────────────────────────────────────────── */}
           {activeTab === 'financial' && (
             <div className="px-5 py-4 space-y-3">
-              <ProfileSection title="Salary" accent="bg-emerald-50 text-emerald-600">
-                <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-3.5">
-                  <div className="col-span-2">
-                    <PField label="Pay Scale" value={staff.payScale} />
-                  </div>
-                  <PField label="Basic Pay"        value={staff.basicPay ? formatINR(staff.basicPay) : ''} />
-                  <PField label="DA %"             value={staff.da  != null ? `${staff.da}%`  : ''} />
-                  <PField label="HRA %"            value={staff.hra != null ? `${staff.hra}%` : ''} />
-                  <PField label="NPS Deduction"    value={staff.nps ? formatINR(staff.nps) : ''} />
-                  <PField label="Professional Tax" value={staff.pt  ? formatINR(staff.pt)  : ''} />
-                </dl>
-              </ProfileSection>
+              {(() => {
+                const slip = salarySlips?.[0] ?? null;
+                const daPercent  = slip?.basicPay ? +(slip.daAmount  / slip.basicPay * 100).toFixed(1) : null;
+                const hraPercent = slip?.basicPay ? +(slip.hraAmount / slip.basicPay * 100).toFixed(1) : null;
+                return (
+                  <ProfileSection
+                    title={slip ? `Salary · ${slip.month} ${slip.year}` : 'Salary'}
+                    accent="bg-emerald-50 text-emerald-600"
+                  >
+                    {salaryLoading ? (
+                      <div className="flex justify-center py-4"><Spinner /></div>
+                    ) : slip ? (
+                      <div className="space-y-4">
+                        {/* Pay scale + days */}
+                        <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-3.5">
+                          <div className="col-span-2">
+                            <PField label="Pay Scale" value={staff.payScale || slip.payScale} />
+                          </div>
+                          <PField label="Days Worked" value={slip.daysWorked || ''} />
+                        </dl>
+
+                        {/* Earnings */}
+                        <div>
+                          <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-2.5">Earnings</p>
+                          <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-3.5">
+                            <PField label="Basic Pay"                    value={`₹${slip.basicPay.toLocaleString('en-IN')}`} />
+                            <PField label={`DA${daPercent != null ? ` (${daPercent}%)` : ''}`}   value={`₹${slip.daAmount.toLocaleString('en-IN')}`} />
+                            <PField label={`HRA${hraPercent != null ? ` (${hraPercent}%)` : ''}`} value={`₹${slip.hraAmount.toLocaleString('en-IN')}`} />
+                            <PField label="IR"          value={fmtN(slip.ir)} />
+                            <PField label="SFN"         value={fmtN(slip.sfn ?? 0)} />
+                            <PField label="P"           value={fmtN(slip.p ?? 0)} />
+                            <PField label="SPAY-TYPIST" value={fmtN(slip.spayTypist ?? 0)} />
+                            <PField label="Gross Salary" value={<span className="text-sky-700 font-bold">₹{slip.gross.toLocaleString('en-IN')}</span>} />
+                          </dl>
+                        </div>
+
+                        {/* Deductions */}
+                        <div>
+                          <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-2.5">Deductions</p>
+                          <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-3.5">
+                            <PField label="IT"    value={fmtN(slip.itDeduction)} />
+                            <PField label="PT"    value={fmtN(slip.ptDeduction)} />
+                            <PField label="GSLIC" value={fmtN(slip.gslic)} />
+                            <PField label="LIC"   value={fmtN(slip.lic)} />
+                            <PField label="FBF"   value={fmtN(slip.fbf)} />
+                            <PField label="Total Deductions" value={<span className="text-red-600 font-bold">₹{slip.totalDeductions.toLocaleString('en-IN')}</span>} />
+                          </dl>
+                        </div>
+
+                        {/* Net */}
+                        <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
+                          <span className="text-[9px] font-bold uppercase tracking-widest text-emerald-600">Net Salary</span>
+                          <span className="text-lg font-bold text-emerald-700 tabular-nums">₹{slip.netSalary.toLocaleString('en-IN')}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-3.5">
+                        <div className="col-span-2">
+                          <PField label="Pay Scale" value={staff.payScale} />
+                        </div>
+                        <PField label="Basic Pay" value={staff.basicPay ? formatINR(staff.basicPay) : ''} />
+                        <PField label="DA %"      value={staff.da  != null ? `${staff.da}%`  : ''} />
+                        <PField label="HRA %"     value={staff.hra != null ? `${staff.hra}%` : ''} />
+                        <p className="col-span-4 text-[10px] text-gray-300 mt-1">No salary records imported yet</p>
+                      </dl>
+                    )}
+                  </ProfileSection>
+                );
+              })()}
 
               <ProfileSection title="Payroll IDs" accent="bg-sky-50 text-sky-600">
                 <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-3.5">
