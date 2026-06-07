@@ -583,37 +583,13 @@ export default function StaffProfile() {
             ) : (
               <div className="px-5 py-4 space-y-3">
 
-                {/* Summary chips */}
-                {salarySlips && salarySlips.length > 0 && (() => {
-                  const totalGross = salarySlips.reduce((s, r) => s + r.gross, 0);
-                  const totalNet   = salarySlips.reduce((s, r) => s + r.netSalary, 0);
-                  return (
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3 flex flex-col gap-1">
-                        <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest">Records</span>
-                        <span className="text-2xl font-bold text-emerald-700">{salarySlips.length}</span>
-                        <span className="text-[10px] text-gray-500">months of data</span>
-                      </div>
-                      <div className="rounded-xl border border-sky-100 bg-sky-50 p-3 flex flex-col gap-1">
-                        <span className="text-[9px] font-bold text-sky-500 uppercase tracking-widest">Total Gross</span>
-                        <span className="text-base font-bold text-sky-700 tabular-nums">₹{totalGross.toLocaleString('en-IN')}</span>
-                        <span className="text-[10px] text-gray-500">across all months</span>
-                      </div>
-                      <div className="rounded-xl border border-violet-100 bg-violet-50 p-3 flex flex-col gap-1">
-                        <span className="text-[9px] font-bold text-violet-500 uppercase tracking-widest">Total Net</span>
-                        <span className="text-base font-bold text-violet-700 tabular-nums">₹{totalNet.toLocaleString('en-IN')}</span>
-                        <span className="text-[10px] text-gray-500">after all deductions</span>
-                      </div>
-                    </div>
-                  );
-                })()}
-
                 {/* Table */}
                 {!salarySlips || salarySlips.length === 0 ? (
                   <p className="text-xs text-gray-300 text-center py-8 border border-dashed border-gray-200 rounded-xl">
                     No salary records found for this staff member
                   </p>
                 ) : (
+                  <>
                   <div className="rounded-xl border border-gray-100 overflow-auto max-h-[420px]">
                       <table className="w-full text-xs border-collapse">
                         <thead className="sticky top-0 z-10">
@@ -699,6 +675,10 @@ export default function StaffProfile() {
                         })()}
                       </table>
                   </div>
+                  <p className="text-[10px] text-gray-400 text-right mt-1 pr-1">
+                    {salarySlips.length} record{salarySlips.length !== 1 ? 's' : ''}
+                  </p>
+                  </>
                 )}
               </div>
             )
