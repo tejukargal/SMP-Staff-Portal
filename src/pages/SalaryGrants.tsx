@@ -537,19 +537,19 @@ export default function SalaryGrants() {
                             : <span className="text-gray-300">—</span>}
                         </td>
                         <td className={`${TD} text-right tabular-nums`}>
-                          {row.grant?.grantsReceivedGross
-                            ? <span className="font-semibold text-amber-700">{fmt(row.grant.grantsReceivedGross)}</span>
-                            : <span className="text-gray-300">—</span>}
+                          <span className={isSaved ? 'font-semibold text-amber-700' : 'text-gray-400'}>
+                            {fmt(row.grant?.grantsReceivedGross ?? src?.gross ?? 0)}
+                          </span>
                         </td>
                         <td className={`${TD} text-right tabular-nums`}>
-                          {row.grant?.grantsReceivedDeductions
-                            ? <span className="font-semibold text-red-600">{fmt(row.grant.grantsReceivedDeductions)}</span>
-                            : <span className="text-gray-300">—</span>}
+                          <span className={isSaved ? 'font-semibold text-red-600' : 'text-gray-400'}>
+                            {fmt(row.grant?.grantsReceivedDeductions ?? src?.totalDeductions ?? 0)}
+                          </span>
                         </td>
                         <td className={`${TD} text-right tabular-nums`}>
-                          {row.grant?.grantsReceivedNet
-                            ? <span className="font-bold text-teal-700">{fmt(row.grant.grantsReceivedNet)}</span>
-                            : <span className="text-gray-300">—</span>}
+                          <span className={isSaved ? 'font-bold text-teal-700' : 'text-gray-400'}>
+                            {fmt(row.grant?.grantsReceivedNet ?? src?.netSalary ?? 0)}
+                          </span>
                         </td>
                         <td className={`${TD} text-center`}>
                           {row.grant?.salaryCreditedDate
