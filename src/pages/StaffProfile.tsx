@@ -379,6 +379,27 @@ export default function StaffProfile() {
                 const slip = salarySlips?.[0] ?? null;
                 const daPercent  = slip?.basicPay ? +(slip.daAmount  / slip.basicPay * 100).toFixed(1) : null;
                 const hraPercent = slip?.basicPay ? +(slip.hraAmount / slip.basicPay * 100).toFixed(1) : null;
+                const inr = (n: number) => `₹${n.toLocaleString('en-IN')}`;
+
+                type Accent = 'sky' | 'red' | 'emerald';
+                const accentCls: Record<Accent, { bg: string; label: string; value: string }> = {
+                  sky:     { bg: 'bg-sky-50',     label: 'text-sky-500',     value: 'text-sky-700 font-bold' },
+                  red:     { bg: 'bg-red-50',     label: 'text-red-400',     value: 'text-red-700 font-bold' },
+                  emerald: { bg: 'bg-emerald-50', label: 'text-emerald-500', value: 'text-emerald-700 font-bold' },
+                };
+                function SCell({ label, value, accent }: { label: string; value: string; accent?: Accent }) {
+                  const a = accent ? accentCls[accent] : null;
+                  return (
+                    <div className={`flex-1 min-w-0 flex flex-col px-3 py-2.5 ${a ? a.bg : 'bg-white'}`}>
+                      <span className={`text-[9px] font-semibold uppercase tracking-wider leading-tight truncate ${a ? a.label : 'text-gray-400'}`}>{label}</span>
+                      <span className={`text-xs tabular-nums mt-0.5 truncate ${a ? a.value : 'text-gray-800 font-medium'}`}>{value}</span>
+                    </div>
+                  );
+                }
+                const Row = ({ children }: { children: React.ReactNode }) => (
+                  <div className="flex rounded-xl border border-gray-100 overflow-hidden divide-x divide-gray-100">{children}</div>
+                );
+
                 return (
                   <ProfileSection
                     title={slip ? `Salary · ${slip.month} ${slip.year}` : 'Salary'}
@@ -387,48 +408,33 @@ export default function StaffProfile() {
                     {salaryLoading ? (
                       <div className="flex justify-center py-4"><Spinner /></div>
                     ) : slip ? (
-                      <div className="space-y-4">
-                        {/* Pay scale + days */}
-                        <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-3.5">
-                          <div className="col-span-2">
-                            <PField label="Pay Scale" value={staff.payScale || slip.payScale} />
-                          </div>
-                          <PField label="Days Worked" value={slip.daysWorked || ''} />
-                        </dl>
-
-                        {/* Earnings */}
-                        <div>
-                          <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-2.5">Earnings</p>
-                          <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-3.5">
-                            <PField label="Basic Pay"                    value={`₹${slip.basicPay.toLocaleString('en-IN')}`} />
-                            <PField label={`DA${daPercent != null ? ` (${daPercent}%)` : ''}`}   value={`₹${slip.daAmount.toLocaleString('en-IN')}`} />
-                            <PField label={`HRA${hraPercent != null ? ` (${hraPercent}%)` : ''}`} value={`₹${slip.hraAmount.toLocaleString('en-IN')}`} />
-                            <PField label="IR"          value={fmtN(slip.ir)} />
-                            <PField label="SFN"         value={fmtN(slip.sfn ?? 0)} />
-                            <PField label="P"           value={fmtN(slip.p ?? 0)} />
-                            <PField label="SPAY-TYPIST" value={fmtN(slip.spayTypist ?? 0)} />
-                            <PField label="Gross Salary" value={<span className="text-sky-700 font-bold">₹{slip.gross.toLocaleString('en-IN')}</span>} />
-                          </dl>
-                        </div>
-
-                        {/* Deductions */}
-                        <div>
-                          <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 mb-2.5">Deductions</p>
-                          <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-3.5">
-                            <PField label="IT"    value={fmtN(slip.itDeduction)} />
-                            <PField label="PT"    value={fmtN(slip.ptDeduction)} />
-                            <PField label="GSLIC" value={fmtN(slip.gslic)} />
-                            <PField label="LIC"   value={fmtN(slip.lic)} />
-                            <PField label="FBF"   value={fmtN(slip.fbf)} />
-                            <PField label="Total Deductions" value={<span className="text-red-600 font-bold">₹{slip.totalDeductions.toLocaleString('en-IN')}</span>} />
-                          </dl>
-                        </div>
-
-                        {/* Net */}
-                        <div className="pt-3 border-t border-gray-100 flex items-center justify-between">
-                          <span className="text-[9px] font-bold uppercase tracking-widest text-emerald-600">Net Salary</span>
-                          <span className="text-lg font-bold text-emerald-700 tabular-nums">₹{slip.netSalary.toLocaleString('en-IN')}</span>
-                        </div>
+                      <div className="space-y-1.5">
+                        {/* Row 1 — Earnings */}
+                        <Row>
+                          <SCell label="Basic Pay"                                          value={inr(slip.basicPay)} />
+                          <SCell label={`DA${daPercent != null ? ` (${daPercent}%)`  : ''}`} value={inr(slip.daAmount)} />
+                          <SCell label={`HRA${hraPercent != null ? ` (${hraPercent}%)` : ''}`} value={inr(slip.hraAmount)} />
+                          <SCell label="IR"          value={fmtN(slip.ir)} />
+                          <SCell label="SFN"         value={fmtN(slip.sfn ?? 0)} />
+                          <SCell label="P"           value={fmtN(slip.p ?? 0)} />
+                          <SCell label="SPAY-TYPIST" value={fmtN(slip.spayTypist ?? 0)} />
+                          <SCell label="Gross"       value={inr(slip.gross)} accent="sky" />
+                        </Row>
+                        {/* Row 2 — Deductions */}
+                        <Row>
+                          <SCell label="IT"    value={fmtN(slip.itDeduction)} />
+                          <SCell label="PT"    value={fmtN(slip.ptDeduction)} />
+                          <SCell label="GSLIC" value={fmtN(slip.gslic)} />
+                          <SCell label="LIC"   value={fmtN(slip.lic)} />
+                          <SCell label="FBF"   value={fmtN(slip.fbf)} />
+                          <SCell label="Total Deductions" value={inr(slip.totalDeductions)} accent="red" />
+                        </Row>
+                        {/* Row 3 — Meta + Net */}
+                        <Row>
+                          <SCell label="Pay Scale"   value={staff.payScale || slip.payScale || '—'} />
+                          <SCell label="Days Worked" value={slip.daysWorked ? String(slip.daysWorked) : '—'} />
+                          <SCell label="Net Salary"  value={inr(slip.netSalary)} accent="emerald" />
+                        </Row>
                       </div>
                     ) : (
                       <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-3.5">
