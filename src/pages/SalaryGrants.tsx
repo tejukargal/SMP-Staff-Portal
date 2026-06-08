@@ -30,6 +30,22 @@ function normalizeMonth(m: string): string {
 
 function fmt(n: number): string { return n ? n.toLocaleString('en-IN') : '—'; }
 
+function isoToDmy(iso: string): string {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function dmyToIso(dmy: string): string {
+  if (!dmy) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dmy)) return dmy;
+  const parts = dmy.replace(/-/g, '/').split('/');
+  if (parts.length !== 3) return '';
+  const [d, m, y] = parts;
+  const year = y.length === 2 ? '20' + y : y;
+  return `${year}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+}
+
 function fmtDate(iso: string): string {
   if (!iso) return '—';
   const [y, m, d] = iso.split('-').map(Number);
@@ -115,8 +131,8 @@ function draftFromRow(row: GrantRow): EditDraft {
     grantsReceivedGross:       row.grant?.grantsReceivedGross ?? (src?.gross ?? 0),
     grantsReceivedDeductions:  row.grant?.grantsReceivedDeductions ?? (src?.totalDeductions ?? 0),
     grantsReceivedNet:         row.grant?.grantsReceivedNet ?? (src?.netSalary ?? 0),
-    salaryCreditedDate:        row.grant?.salaryCreditedDate ?? '',
-    deductionsReceivedDate:    row.grant?.deductionsReceivedDate ?? '',
+    salaryCreditedDate:        isoToDmy(row.grant?.salaryCreditedDate ?? ''),
+    deductionsReceivedDate:    isoToDmy(row.grant?.deductionsReceivedDate ?? ''),
   };
 }
 
@@ -305,7 +321,11 @@ export default function SalaryGrants() {
     if (!editDraft || !user) return;
     setSaving(true);
     try {
-      await upsertSalaryGrant(editDraft, user.uid);
+      await upsertSalaryGrant({
+        ...editDraft,
+        salaryCreditedDate:     dmyToIso(editDraft.salaryCreditedDate),
+        deductionsReceivedDate: dmyToIso(editDraft.deductionsReceivedDate),
+      }, user.uid);
       showToast('success', `Saved grant for ${editDraft.month} ${editDraft.year}`);
       setEditingKey(null);
       setEditDraft(null);
@@ -628,16 +648,20 @@ export default function SalaryGrants() {
                           {numInput('grantsReceivedNet', 'border-amber-300 focus:ring-amber-400', 'text-teal-700 font-bold')}
                         </td>
                         <td className={TD}>
-                          <input type="date"
+                          <input type="text"
                             value={d?.salaryCreditedDate ?? ''}
                             onChange={(e) => patch({ salaryCreditedDate: e.target.value })}
+                            placeholder="dd/mm/yyyy"
+                            maxLength={10}
                             className={`${INPUT_BASE} border-amber-300 focus:ring-amber-400`}
                           />
                         </td>
                         <td className={`${TD} border-r border-gray-100`}>
-                          <input type="date"
+                          <input type="text"
                             value={d?.deductionsReceivedDate ?? ''}
                             onChange={(e) => patch({ deductionsReceivedDate: e.target.value })}
+                            placeholder="dd/mm/yyyy"
+                            maxLength={10}
                             className={`${INPUT_BASE} border-amber-300 focus:ring-amber-400`}
                           />
                         </td>
