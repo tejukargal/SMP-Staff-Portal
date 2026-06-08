@@ -224,7 +224,7 @@ export default function SalaryGrants() {
       }))
       .sort((a, b) =>
         a.year !== b.year ? b.year - a.year
-          : (MONTH_ORDER[b.month] ?? 0) - (MONTH_ORDER[a.month] ?? 0)
+          : (MONTH_ORDER[b.month.toUpperCase()] ?? 0) - (MONTH_ORDER[a.month.toUpperCase()] ?? 0)
       );
   }, [slipAggregates, grantMap, extraKeys]);
 
@@ -236,24 +236,24 @@ export default function SalaryGrants() {
   );
 
   const visibleRows = useMemo(() => {
+    const moKey = (m: string) => (MONTH_ORDER[m.toUpperCase()] ?? MONTH_ORDER[m] ?? 0);
     if (filterMode === 'single') {
       if (!filterYear && !filterMonth) return rows;
       return rows.filter(r => {
         if (filterYear && r.year !== Number(filterYear)) return false;
-        if (filterMonth && r.month !== filterMonth) return false;
+        if (filterMonth && r.month.toUpperCase() !== filterMonth.toUpperCase()) return false;
         return true;
       });
     }
-    const mo = MONTH_ORDER;
     const fromKey = rangeFromYear
-      ? Number(rangeFromYear) * 100 + (rangeFromMonth ? (mo[rangeFromMonth] ?? 0) : 0)
+      ? Number(rangeFromYear) * 100 + (rangeFromMonth ? moKey(rangeFromMonth) : 0)
       : -Infinity;
     const toKey = rangeToYear
-      ? Number(rangeToYear) * 100 + (rangeToMonth ? (mo[rangeToMonth] ?? 0) : 11)
+      ? Number(rangeToYear) * 100 + (rangeToMonth ? moKey(rangeToMonth) : 11)
       : Infinity;
     if (fromKey === -Infinity && toKey === Infinity) return rows;
     return rows.filter(r => {
-      const k = r.year * 100 + (mo[r.month] ?? 0);
+      const k = r.year * 100 + moKey(r.month);
       return k >= fromKey && k <= toKey;
     });
   }, [rows, filterMode, filterYear, filterMonth, rangeFromYear, rangeFromMonth, rangeToYear, rangeToMonth]);
