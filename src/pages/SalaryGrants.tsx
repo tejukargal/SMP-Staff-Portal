@@ -12,6 +12,22 @@ import type { SalarySlip, SalaryGrant } from '@/types';
 
 const MONTH_ORDER = Object.fromEntries(MONTHS.map((m, i) => [m, i]));
 
+const MONTH_ALIASES: Record<string, string> = {
+  'FEBURARY': 'FEBRUARY', 'FEBRAURY': 'FEBRUARY', 'FEBUARY': 'FEBRUARY',
+  'JANURAY': 'JANUARY',   'JANUERY': 'JANUARY',
+  'MARCHH':  'MARCH',
+  'APIRL':   'APRIL',
+  'SEPTEMBAR': 'SEPTEMBER', 'SEPTMBER': 'SEPTEMBER', 'SEPEMBER': 'SEPTEMBER',
+  'OCTOMBER': 'OCTOBER',  'OCOBER': 'OCTOBER',
+  'NOVMBER': 'NOVEMBER',  'NOVEBER': 'NOVEMBER',
+  'DECMBER': 'DECEMBER',  'DECEBER': 'DECEMBER',
+};
+
+function normalizeMonth(m: string): string {
+  const upper = m.trim().toUpperCase();
+  return MONTH_ALIASES[upper] ?? upper;
+}
+
 function fmt(n: number): string { return n ? n.toLocaleString('en-IN') : '—'; }
 
 function fmtDate(iso: string): string {
@@ -217,14 +233,14 @@ export default function SalaryGrants() {
     return [...keys]
       .map(key => ({
         key,
-        month: slipAggregates.get(key)?.month ?? grantMap.get(key)?.month ?? key.split('_')[0],
+        month: normalizeMonth(slipAggregates.get(key)?.month ?? grantMap.get(key)?.month ?? key.split('_')[0]),
         year:  slipAggregates.get(key)?.year  ?? grantMap.get(key)?.year  ?? Number(key.split('_')[1]),
         aggr:  slipAggregates.get(key) ?? null,
         grant: grantMap.get(key) ?? null,
       }))
       .sort((a, b) =>
         a.year !== b.year ? b.year - a.year
-          : (MONTH_ORDER[b.month.toUpperCase()] ?? 0) - (MONTH_ORDER[a.month.toUpperCase()] ?? 0)
+          : (MONTH_ORDER[b.month] ?? 0) - (MONTH_ORDER[a.month] ?? 0)
       );
   }, [slipAggregates, grantMap, extraKeys]);
 
@@ -236,12 +252,12 @@ export default function SalaryGrants() {
   );
 
   const visibleRows = useMemo(() => {
-    const moKey = (m: string) => (MONTH_ORDER[m.toUpperCase()] ?? MONTH_ORDER[m] ?? 0);
+    const moKey = (m: string) => (MONTH_ORDER[normalizeMonth(m)] ?? 0);
     if (filterMode === 'single') {
       if (!filterYear && !filterMonth) return rows;
       return rows.filter(r => {
         if (filterYear && r.year !== Number(filterYear)) return false;
-        if (filterMonth && r.month.toUpperCase() !== filterMonth.toUpperCase()) return false;
+        if (filterMonth && normalizeMonth(r.month) !== normalizeMonth(filterMonth)) return false;
         return true;
       });
     }
