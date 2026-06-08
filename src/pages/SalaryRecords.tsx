@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, useTransition } from 'react';
 import { Search, Download, UploadCloud, FileText, CheckCircle2, AlertTriangle, X, Trash2, ChevronDown, Eye, EyeOff } from 'lucide-react';
 import { Timestamp } from 'firebase/firestore';
 import { Button } from '@/components/ui/Button';
@@ -288,12 +288,15 @@ export default function SalaryRecords() {
   const { user } = useAuth();
   const { staff } = useStaff();
   const { showToast } = useToast();
+  const [, startTransition] = useTransition();
 
   const [allSlips, setAllSlips]           = useState<SalarySlip[]>([]);
   const [loading, setLoading]             = useState(true);
   const [visibleMonthCount, setVisibleMonthCount] = useState(1);
 
   const [search, setSearch]               = useState('');
+  const [searchInput, setSearchInput]     = useState('');
+  const searchTimerRef                    = useRef<ReturnType<typeof setTimeout>>(null!);
   const [filterMonth, setFilterMonth]     = useState('');
   const [filterYear, setFilterYear]       = useState('');
   const [filterDept, setFilterDept]       = useState('');
@@ -327,6 +330,16 @@ export default function SalaryRecords() {
     [allSlips, empNameMap],
   );
 
+  // ── Pre-computed search index — all searchable fields joined into one uppercase string per slip ──
+  const searchIndex = useMemo(() =>
+    enrichedSlips.map((slip) => ({
+      slip,
+      searchStr: [slip.staffName, slip.empId, normEmpId(slip.empId)]
+        .filter(Boolean).join('|').toUpperCase(),
+    })),
+    [enrichedSlips],
+  );
+
   // ── Month/year options sorted ASC ──
   const monthYearOptions = useMemo(() => buildMonthYearOptions(enrichedSlips), [enrichedSlips]);
   const uniqueYears  = useMemo(() => [...new Set(monthYearOptions.map((o) => String(o.year)))], [monthYearOptions]);
@@ -355,7 +368,10 @@ export default function SalaryRecords() {
     };
   }, [enrichedSlips, empStaffMap]);
 
+  // anyFilterActive drives data computations (uses debounced search to avoid expensive recalc on every keystroke)
   const anyFilterActive = !!(filterMonth || filterYear || filterDept || filterType || filterStatus || filterDesig || search);
+  // anyUiFilterActive drives UI chrome (clear button, etc.) — uses immediate searchInput for instant feedback
+  const anyUiFilterActive = !!(filterMonth || filterYear || filterDept || filterType || filterStatus || filterDesig || searchInput);
 
   // ── Pagination: show most recent N months when no filter active ──
   const visibleMonthYearKeys = useMemo(() => {
@@ -364,10 +380,11 @@ export default function SalaryRecords() {
     return new Set(monthYearOptions.slice(-visibleMonthCount).map((o) => o.key));
   }, [monthYearOptions, visibleMonthCount, anyFilterActive]);
 
-  // ── Filter + search ──
+  // ── Filter + search (uses pre-built searchIndex so no per-keystroke toUpperCase on all fields) ──
+  const q = search.trim().toUpperCase();
   const filtered = useMemo(() =>
-    enrichedSlips
-      .filter((slip) => {
+    searchIndex
+      .filter(({ slip, searchStr }) => {
         if (visibleMonthYearKeys && !visibleMonthYearKeys.has(slip.monthYear)) return false;
         if (filterMonth && slip.month !== filterMonth) return false;
         if (filterYear  && String(slip.year) !== filterYear) return false;
@@ -376,16 +393,17 @@ export default function SalaryRecords() {
         if (filterType   && stf?.type        !== filterType)   return false;
         if (filterStatus && stf?.status      !== filterStatus) return false;
         if (filterDesig  && stf?.designation !== filterDesig)  return false;
-        const q = search.trim().toUpperCase();
-        if (q && !slip.staffName.toUpperCase().includes(q) && !slip.empId.includes(q) && !normEmpId(slip.empId).includes(q)) return false;
+        if (q && !searchStr.includes(q)) return false;
         return true;
       })
+      .map(({ slip }) => slip)
       .sort((a, b) => {
         if (a.year !== b.year) return b.year - a.year;
         const mo = (MONTH_ORDER[b.month] ?? 0) - (MONTH_ORDER[a.month] ?? 0);
         return mo !== 0 ? mo : a.staffName.localeCompare(b.staffName);
       }),
-    [enrichedSlips, visibleMonthYearKeys, filterMonth, filterYear, filterDept, filterType, filterStatus, filterDesig, search, empStaffMap],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [searchIndex, visibleMonthYearKeys, filterMonth, filterYear, filterDept, filterType, filterStatus, filterDesig, q, empStaffMap],
   );
 
   // ── Totals ──
@@ -419,8 +437,10 @@ export default function SalaryRecords() {
   const existingMonthYears = useMemo(() => new Set(allSlips.map((s) => s.monthYear)), [allSlips]);
 
   function clearFilters() {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     setFilterMonth(''); setFilterYear(''); setFilterDept('');
-    setFilterType(''); setFilterStatus(''); setFilterDesig(''); setSearch('');
+    setFilterType(''); setFilterStatus(''); setFilterDesig('');
+    setSearch(''); setSearchInput('');
   }
 
   function handleExport() {
@@ -460,6 +480,13 @@ export default function SalaryRecords() {
 
   const [showInfoCols, setShowInfoCols] = useState(false);
 
+  const PAGE_SIZE = 100;
+  const [visibleRowCount, setVisibleRowCount] = useState(PAGE_SIZE);
+  // Reset pagination whenever the filtered result set changes
+  useEffect(() => { setVisibleRowCount(PAGE_SIZE); }, [filtered]);
+  const displayRows = filtered.slice(0, visibleRowCount);
+  const hiddenRowCount = filtered.length - displayRows.length;
+
   // Table column definitions
   const COL_HEADERS = ['Emp ID','Name','Dept','Type','Status','Month','Year','Designation','Days','Basic','DA','HRA','IR','SFN','P','SPAY','Gross','IT','PT','GSLIC','LIC','FBF','Tot. Ded.','Net'];
   const RIGHT_COLS  = new Set(['Days','Basic','DA','HRA','IR','SFN','P','SPAY','Gross','IT','PT','GSLIC','LIC','FBF','Tot. Ded.','Net']);
@@ -480,8 +507,13 @@ export default function SalaryRecords() {
         {/* Search */}
         <div className="relative shrink-0">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-          <input type="text" placeholder="Search name or ID…" value={search}
-            onChange={(e) => setSearch(e.target.value)}
+          <input type="text" placeholder="Search name or ID…" value={searchInput}
+            onChange={(e) => {
+              const v = e.target.value;
+              setSearchInput(v);
+              if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+              searchTimerRef.current = setTimeout(() => startTransition(() => setSearch(v)), 300);
+            }}
             className="pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white w-40 cursor-text" />
         </div>
 
@@ -495,7 +527,7 @@ export default function SalaryRecords() {
         <FilterSelect label="Status" value={filterStatus} onChange={setFilterStatus} options={filterOptions.statuses} />
         <FilterSelect label="Desig." value={filterDesig}  onChange={setFilterDesig}  options={filterOptions.desigs} />
 
-        {anyFilterActive && (
+        {anyUiFilterActive && (
           <button onClick={clearFilters}
             className="cursor-pointer inline-flex items-center gap-1 text-xs font-medium text-gray-500 hover:text-red-600 border border-gray-200 hover:border-red-300 rounded-lg px-2 py-1.5 bg-white transition-colors shrink-0">
             <X className="w-3 h-3" /> Clear
@@ -586,11 +618,12 @@ export default function SalaryRecords() {
             </thead>
 
             <tbody className="divide-y divide-gray-100">
-              {filtered.map((r, rowIdx) => {
+              {displayRows.map((r, rowIdx) => {
                 const stf = empStaffMap.get(normEmpId(r.empId));
                 return (
                   <tr key={r.id} className="hover:bg-sky-50/40 transition-colors"
-                    style={{ animation: 'content-enter 0.25s ease-out both', animationDelay: `${Math.min(rowIdx * 0.018, 0.28)}s` }}>
+                    style={{ animation: 'content-enter 0.25s ease-out both', animationDelay: `${Math.min(rowIdx * 0.018, 0.28)}s` }}
+>
                     <td className="px-3 py-2 font-mono text-gray-600 whitespace-nowrap">{r.empId}</td>
                     <td className="px-3 py-2 font-medium text-gray-800 whitespace-nowrap">{r.staffName || <span className="text-gray-400 italic">—</span>}</td>
                     <td className={`px-3 py-2 text-gray-600 whitespace-nowrap ${ic}`}>
@@ -658,19 +691,29 @@ export default function SalaryRecords() {
         )}
       </div>
 
-      {/* ── Load More — always occupies same height to prevent table resize ── */}
+      {/* ── Load More row — always occupies same height to prevent table resize ── */}
       <div className="flex-shrink-0 h-6 flex items-center justify-center gap-3">
-        {canLoadMore && (
+        {hiddenRowCount > 0 ? (
+          <>
+            <span className="text-xs text-gray-400">
+              Showing <strong>{displayRows.length}</strong> of <strong>{filtered.length}</strong> records
+            </span>
+            <button onClick={() => setVisibleRowCount((c) => c + PAGE_SIZE)}
+              className="cursor-pointer inline-flex items-center gap-1 text-xs font-medium text-sky-600 hover:text-sky-800 border border-sky-200 hover:border-sky-400 rounded-full px-3 py-1 transition-colors bg-white">
+              <ChevronDown className="w-3 h-3" /> Load More ({hiddenRowCount})
+            </button>
+          </>
+        ) : canLoadMore ? (
           <>
             <span className="text-xs text-gray-400">
               Showing from <strong>{oldestShownLabel}</strong> · {monthYearOptions.length - visibleMonthCount} older month{monthYearOptions.length - visibleMonthCount !== 1 ? 's' : ''} not loaded
             </span>
             <button onClick={() => setVisibleMonthCount((c) => c + 1)}
               className="cursor-pointer inline-flex items-center gap-1 text-xs font-medium text-sky-600 hover:text-sky-800 border border-sky-200 hover:border-sky-400 rounded-full px-3 py-1 transition-colors bg-white">
-              <ChevronDown className="w-3 h-3" /> Load More
+              <ChevronDown className="w-3 h-3" /> Load Older Month
             </button>
           </>
-        )}
+        ) : null}
       </div>
 
       <ImportPanel open={importOpen} onClose={() => setImportOpen(false)}
