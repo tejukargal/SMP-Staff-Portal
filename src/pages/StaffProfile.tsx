@@ -181,7 +181,7 @@ export default function StaffProfile() {
   const chipCls  = STATUS_CHIP[staff.status]     ?? 'bg-white/20 border-white/30';
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col" style={{ animation: 'page-enter 0.35s ease-out' }}>
 
       {/* ── Main card — fills full height ─────────────────────────────── */}
       <div className="flex-1 min-h-0 rounded-2xl shadow-sm border border-gray-100 flex flex-col overflow-hidden bg-white">
@@ -377,8 +377,8 @@ export default function StaffProfile() {
             <div className="px-5 py-4 space-y-3">
               {(() => {
                 const slip = salarySlips?.[0] ?? null;
-                const daPercent  = slip?.basicPay ? +(slip.daAmount  / slip.basicPay * 100).toFixed(1) : null;
-                const hraPercent = slip?.basicPay ? +(slip.hraAmount / slip.basicPay * 100).toFixed(1) : null;
+                const daPercent  = slip?.basicPay ? (slip.daAmount  / slip.basicPay * 100).toFixed(2) : null;
+                const hraPercent = slip?.basicPay ? (slip.hraAmount / slip.basicPay * 100).toFixed(1) : null;
                 const inr = (n: number) => `₹${n.toLocaleString('en-IN')}`;
 
                 type Accent = 'sky' | 'red' | 'emerald';
@@ -391,8 +391,8 @@ export default function StaffProfile() {
                   const a = accent ? accentCls[accent] : null;
                   return (
                     <div className={`flex-1 min-w-0 flex flex-col px-3 py-2.5 ${a ? a.bg : 'bg-white'}`}>
-                      <span className={`text-[9px] font-semibold uppercase tracking-wider leading-tight truncate ${a ? a.label : 'text-gray-400'}`}>{label}</span>
-                      <span className={`text-xs tabular-nums mt-0.5 truncate ${a ? a.value : 'text-gray-800 font-medium'}`}>{value}</span>
+                      <span className={`text-[10px] font-semibold uppercase tracking-wider leading-tight truncate ${a ? a.label : 'text-gray-400'}`}>{label}</span>
+                      <span className={`text-[13px] tabular-nums mt-0.5 truncate ${a ? a.value : 'text-gray-800 font-medium'}`}>{value}</span>
                     </div>
                   );
                 }
@@ -442,7 +442,7 @@ export default function StaffProfile() {
                           <PField label="Pay Scale" value={staff.payScale} />
                         </div>
                         <PField label="Basic Pay" value={staff.basicPay ? formatINR(staff.basicPay) : ''} />
-                        <PField label="DA %"      value={staff.da  != null ? `${staff.da}%`  : ''} />
+                        <PField label="DA %"      value={staff.da  != null ? `${Number(staff.da).toFixed(2)}%`  : ''} />
                         <PField label="HRA %"     value={staff.hra != null ? `${staff.hra}%` : ''} />
                         <p className="col-span-4 text-[10px] text-gray-300 mt-1">No salary records imported yet</p>
                       </dl>
@@ -454,7 +454,7 @@ export default function StaffProfile() {
               <ProfileSection title="Payroll IDs" accent="bg-sky-50 text-sky-600">
                 <dl className="grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-3.5">
                   <PField label="Recipient ID" value={staff.recipientId} mono />
-                  <PField label="Biometric ID" value={staff.biometricId} mono />
+                  <PField label="Biometric ID" value={staff.biometricId || (staff.aadhar ? staff.aadhar.replace(/\D/g, '').slice(-8) : '')} mono />
                 </dl>
               </ProfileSection>
 

@@ -411,7 +411,7 @@ export default function Dashboard() {
   if (loading) return <PageSpinner />;
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-5" style={{ animation: 'page-enter 0.35s ease-out' }}>
 
       {/* ── Staff search ─────────────────────────────────────────────────── */}
       <div ref={searchRef} className="relative">

@@ -86,7 +86,7 @@ export default function SalaryBill() {
   if (loading) return <PageSpinner />;
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-5" style={{ animation: 'page-enter 0.35s ease-out' }}>
       {step === 1 && (
         <div className="bg-white rounded-xl border border-[#E2E5EA] p-6 max-w-lg">
           <h2 className="text-base font-semibold text-[#111827] mb-5">Step 1 — Select Parameters</h2>

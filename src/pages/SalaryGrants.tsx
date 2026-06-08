@@ -181,6 +181,14 @@ export default function SalaryGrants() {
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [extraKeys,    setExtraKeys]    = useState<Set<string>>(new Set());
 
+  const [filterMode,     setFilterMode]     = useState<'single' | 'range'>('single');
+  const [filterYear,     setFilterYear]     = useState('');
+  const [filterMonth,    setFilterMonth]    = useState('');
+  const [rangeFromYear,  setRangeFromYear]  = useState('');
+  const [rangeFromMonth, setRangeFromMonth] = useState('');
+  const [rangeToYear,    setRangeToYear]    = useState('');
+  const [rangeToMonth,   setRangeToMonth]   = useState('');
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
@@ -221,6 +229,44 @@ export default function SalaryGrants() {
   }, [slipAggregates, grantMap, extraKeys]);
 
   const existingKeys = useMemo(() => new Set(rows.map(r => r.key)), [rows]);
+
+  const availableYears = useMemo(() =>
+    [...new Set(rows.map(r => r.year))].sort((a, b) => b - a),
+    [rows]
+  );
+
+  const visibleRows = useMemo(() => {
+    if (filterMode === 'single') {
+      if (!filterYear && !filterMonth) return rows;
+      return rows.filter(r => {
+        if (filterYear && r.year !== Number(filterYear)) return false;
+        if (filterMonth && r.month !== filterMonth) return false;
+        return true;
+      });
+    }
+    const mo = MONTH_ORDER;
+    const fromKey = rangeFromYear
+      ? Number(rangeFromYear) * 100 + (rangeFromMonth ? (mo[rangeFromMonth] ?? 0) : 0)
+      : -Infinity;
+    const toKey = rangeToYear
+      ? Number(rangeToYear) * 100 + (rangeToMonth ? (mo[rangeToMonth] ?? 0) : 11)
+      : Infinity;
+    if (fromKey === -Infinity && toKey === Infinity) return rows;
+    return rows.filter(r => {
+      const k = r.year * 100 + (mo[r.month] ?? 0);
+      return k >= fromKey && k <= toKey;
+    });
+  }, [rows, filterMode, filterYear, filterMonth, rangeFromYear, rangeFromMonth, rangeToYear, rangeToMonth]);
+
+  const hasActiveFilter = filterMode === 'single'
+    ? !!(filterYear || filterMonth)
+    : !!(rangeFromYear || rangeFromMonth || rangeToYear || rangeToMonth);
+
+  function clearFilters() {
+    setFilterYear(''); setFilterMonth('');
+    setRangeFromYear(''); setRangeFromMonth('');
+    setRangeToYear(''); setRangeToMonth('');
+  }
 
   const patch = useCallback((updates: Partial<EditDraft>) => {
     setEditDraft(prev => prev ? { ...prev, ...updates } : prev);
@@ -311,6 +357,76 @@ export default function SalaryGrants() {
         </Button>
       </div>
 
+      {/* ── Filter bar ── */}
+      {rows.length > 0 && (
+        <div className="flex-shrink-0 flex items-center gap-2 flex-wrap">
+          {/* Mode toggle */}
+          <div className="flex rounded-lg border border-gray-200 overflow-hidden bg-white text-[11px]">
+            <button onClick={() => setFilterMode('single')}
+              className={`cursor-pointer px-2.5 py-1.5 font-medium transition-colors ${filterMode === 'single' ? 'bg-sky-500 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
+              Single
+            </button>
+            <button onClick={() => setFilterMode('range')}
+              className={`cursor-pointer px-2.5 py-1.5 font-medium transition-colors border-l border-gray-200 ${filterMode === 'range' ? 'bg-sky-500 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
+              Range
+            </button>
+          </div>
+
+          {filterMode === 'single' ? (
+            <>
+              <select value={filterYear} onChange={e => setFilterYear(e.target.value)}
+                className="cursor-pointer text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white text-gray-700 hover:border-sky-300 transition-colors">
+                <option value="">All Years</option>
+                {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+              <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)}
+                className="cursor-pointer text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white text-gray-700 hover:border-sky-300 transition-colors">
+                <option value="">All Months</option>
+                {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </>
+          ) : (
+            <>
+              <span className="text-[11px] text-gray-500 font-medium">From</span>
+              <select value={rangeFromMonth} onChange={e => setRangeFromMonth(e.target.value)}
+                className="cursor-pointer text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white text-gray-700 hover:border-sky-300 transition-colors">
+                <option value="">Month</option>
+                {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+              <select value={rangeFromYear} onChange={e => setRangeFromYear(e.target.value)}
+                className="cursor-pointer text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white text-gray-700 hover:border-sky-300 transition-colors">
+                <option value="">Year</option>
+                {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+              <span className="text-gray-400 text-xs">→</span>
+              <span className="text-[11px] text-gray-500 font-medium">To</span>
+              <select value={rangeToMonth} onChange={e => setRangeToMonth(e.target.value)}
+                className="cursor-pointer text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white text-gray-700 hover:border-sky-300 transition-colors">
+                <option value="">Month</option>
+                {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+              <select value={rangeToYear} onChange={e => setRangeToYear(e.target.value)}
+                className="cursor-pointer text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-300 bg-white text-gray-700 hover:border-sky-300 transition-colors">
+                <option value="">Year</option>
+                {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </>
+          )}
+
+          {hasActiveFilter && (
+            <>
+              <button onClick={clearFilters}
+                className="cursor-pointer flex items-center gap-1 text-[11px] text-gray-500 hover:text-red-600 border border-gray-200 hover:border-red-300 rounded-lg px-2 py-1.5 bg-white transition-colors">
+                <X className="w-3 h-3" /> Clear
+              </button>
+              <span className="text-[11px] text-gray-400">
+                {visibleRows.length} of {rows.length} month{rows.length !== 1 ? 's' : ''}
+              </span>
+            </>
+          )}
+        </div>
+      )}
+
       {/* ── Table ── */}
       <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-gray-200 bg-white">
         {rows.length === 0 ? (
@@ -318,6 +434,11 @@ export default function SalaryGrants() {
             <IndianRupee className="w-12 h-12 text-gray-200" />
             <p className="text-sm font-medium">No salary data yet</p>
             <p className="text-xs">Import salary PDFs in Salary Records, or click <strong>Add Grant Entry</strong></p>
+          </div>
+        ) : visibleRows.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full gap-2 text-gray-400">
+            <p className="text-sm font-medium">No rows match the current filter</p>
+            <button onClick={clearFilters} className="cursor-pointer text-xs text-sky-600 hover:underline">Clear filters</button>
           </div>
         ) : (
           <table className="text-xs border-collapse w-full" style={{ minWidth: 2144 }}>
@@ -396,7 +517,7 @@ export default function SalaryGrants() {
 
             {/* ── Body ── */}
             <tbody className="divide-y divide-gray-100">
-              {rows.map((row, rowIdx) => {
+              {visibleRows.map((row, rowIdx) => {
                 const isEditing = editingKey === row.key;
                 const isSaved   = !!row.grant;
                 const src       = row.grant ?? row.aggr;
@@ -601,19 +722,22 @@ export default function SalaryGrants() {
             </tbody>
 
             {/* ── Footer totals ── */}
-            {rows.length > 0 && (() => {
-              const vis = rows.map(r => r.grant ?? r.aggr);
+            {visibleRows.length > 0 && (() => {
+              const vis = visibleRows.map(r => r.grant ?? r.aggr);
               const sum = (f: keyof SlipAggregate & keyof SalaryGrant) =>
                 vis.reduce((acc, s) => acc + ((s as SlipAggregate | SalaryGrant | null)?.[f] as number || 0), 0);
+              const isFiltered = visibleRows.length !== rows.length;
               return (
                 <tfoot className="sticky bottom-0 z-10">
                   <tr className="bg-gray-50 border-t-2 border-gray-300 text-[11px]">
                     <td className="sticky left-0 z-10 bg-gray-50 px-2.5 py-2 font-bold text-gray-700 whitespace-nowrap border-r border-gray-200"
                       style={{ minWidth: 110 }}>
-                      TOTAL — {rows.length} month{rows.length !== 1 ? 's' : ''}
+                      {isFiltered
+                        ? `TOTAL — ${visibleRows.length} of ${rows.length} months`
+                        : `TOTAL — ${rows.length} month${rows.length !== 1 ? 's' : ''}`}
                     </td>
                     <td className="px-2.5 py-2 text-center font-semibold text-gray-600 border-r border-gray-200">
-                      {rows.reduce((acc, r) => acc + ((r.grant ?? r.aggr)?.staffCount || 0), 0)}
+                      {visibleRows.reduce((acc, r) => acc + ((r.grant ?? r.aggr)?.staffCount || 0), 0)}
                     </td>
                     <td className="px-2.5 py-2 text-right tabular-nums font-bold text-gray-800">{fmt(sum('basicPay'))}</td>
                     <td className="px-2.5 py-2 text-right tabular-nums font-bold text-gray-800">{fmt(sum('daAmount'))}</td>

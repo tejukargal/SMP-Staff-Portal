@@ -173,7 +173,7 @@ export default function Reports() {
   if (loading) return <PageSpinner />;
 
   return (
-    <div className="h-full flex flex-col gap-3">
+    <div className="h-full flex flex-col gap-3" style={{ animation: 'page-enter 0.35s ease-out' }}>
 
       {/* ── Tab bar ─────────────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 flex items-center gap-1.5">

@@ -384,7 +384,7 @@ export default function LicPolicies() {
 
   return (
     <>
-      <div className="h-full flex flex-col gap-4">
+      <div className="h-full flex flex-col gap-4" style={{ animation: 'page-enter 0.35s ease-out' }}>
 
         {/* Header */}
         <div className="flex-shrink-0 flex items-center justify-between">

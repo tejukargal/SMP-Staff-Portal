@@ -321,7 +321,7 @@ export default function StaffForm() {
 
   return (
     <>
-      <form id="staff-form" onSubmit={(e) => { void handleSubmit(e); }} className="flex flex-col gap-4 w-full pb-16">
+      <form id="staff-form" onSubmit={(e) => { void handleSubmit(e); }} className="flex flex-col gap-4 w-full pb-16" style={{ animation: 'page-enter 0.35s ease-out' }}>
       <div className="flex items-center gap-3 mb-1">
         <Button type="button" variant="secondary" size="sm" onClick={() => navigate(-1)}>
           <ArrowLeft className="w-3.5 h-3.5" />

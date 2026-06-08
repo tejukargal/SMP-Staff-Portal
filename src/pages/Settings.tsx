@@ -142,7 +142,7 @@ export default function Settings() {
   if (loading) return <PageSpinner />;
 
   return (
-    <div className="flex flex-col gap-6 max-w-3xl">
+    <div className="flex flex-col gap-6 max-w-3xl" style={{ animation: 'page-enter 0.35s ease-out' }}>
       {/* User Management */}
       <div className="bg-white rounded-xl border border-[#E2E5EA] p-6">
         <div className="flex items-center justify-between mb-5">
