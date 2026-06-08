@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { X, Plus, Pencil, Trash2, ShieldCheck } from 'lucide-react';
-import { Spinner } from '@/components/ui/Spinner';
 import { getLicPolicies, addLicPolicy, updateLicPolicy, deleteLicPolicy } from '@/firebase/firestore';
 import { parseDateInput, fmtDate, isoToInput } from '@/components/staff/LeaveModal';
 import type { StaffRecord, LicPolicy } from '@/types';
@@ -144,12 +143,12 @@ export function LicModal({ open, staff, onClose }: Props) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(4px)' }}
+      style={{ background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(4px)', animation: 'backdrop-enter 0.2s ease-out' }}
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div
         className="relative w-full bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden"
-        style={{ maxWidth: 480, maxHeight: '88vh' }}
+        style={{ maxWidth: 480, maxHeight: '88vh', animation: 'modal-enter 0.22s cubic-bezier(0.34,1.26,0.64,1)' }}
       >
         {/* Header */}
         <div className="flex items-start justify-between px-5 pt-5 pb-3 border-b border-[#F0F2F5] shrink-0">
@@ -175,72 +174,77 @@ export function LicModal({ open, staff, onClose }: Props) {
             <p className="text-[11px] font-semibold text-[#374151] uppercase tracking-wide mb-2">
               Saved Policies{policies.length > 0 ? ` (${policies.length})` : ''}
             </p>
-            {loading ? (
-              <div className="flex justify-center py-6"><Spinner /></div>
-            ) : policies.length === 0 ? (
-              <p className="text-xs text-[#9CA3AF] py-4 text-center border border-dashed border-[#E5E7EB] rounded-xl">
-                No policies added yet
-              </p>
-            ) : (
-              <div className="rounded-xl border border-[#E5E7EB] overflow-hidden">
-                {/* Sticky header */}
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="bg-[#F9FAFB] border-b border-[#E5E7EB]">
-                      <th className="px-3 py-2 text-left font-semibold text-[#6B7280]">Policy No.</th>
-                      <th className="px-3 py-2 text-right font-semibold text-[#6B7280]">Premium (₹)</th>
-                      <th className="px-3 py-2 text-center font-semibold text-[#6B7280]">Maturity</th>
-                      <th className="px-1 py-2 w-14" />
-                    </tr>
-                  </thead>
-                </table>
-                {/* Scrollable body — shows 2 rows, rest scrolls */}
-                <div className="overflow-y-auto" style={{ maxHeight: 66 }}>
-                  <table className="w-full text-xs">
-                    <tbody>
-                      {policies.map((p, i) => {
-                        const beingEdited = editingId === p.id;
-                        return (
-                          <tr
-                            key={p.id}
-                            className={`border-b border-[#F3F4F6] last:border-0 ${beingEdited ? 'bg-[#EFF6FF]' : i % 2 === 1 ? 'bg-[#FAFAFA]' : ''}`}
-                          >
-                            <td className="px-3 py-2 font-mono font-medium text-[#111827]">{p.policyNumber}</td>
-                            <td className="px-3 py-2 text-right font-mono text-[#374151]">
-                              {p.premiumAmount.toLocaleString('en-IN')}
-                            </td>
-                            <td className="px-3 py-2 text-center font-mono text-[#374151]">
-                              {fmtDate(p.maturityDate)}
-                            </td>
-                            <td className="px-1 py-2">
-                              <div className="flex items-center justify-center gap-0.5">
-                                <button
-                                  onClick={() => beingEdited ? resetForm() : startEdit(p)}
-                                  className={`p-1 rounded transition-colors ${beingEdited ? 'text-[#2563EB] bg-[#DBEAFE]' : 'text-[#6B7280] hover:bg-[#F3F4F6]'}`}
-                                  title={beingEdited ? 'Cancel edit' : 'Edit'}
-                                >
-                                  <Pencil className="w-3 h-3" />
-                                </button>
-                                <button
-                                  onClick={() => void handleDelete(p)}
-                                  disabled={deletingId === p.id}
-                                  className="p-1 rounded text-[#DC2626] hover:bg-[#FEF2F2] disabled:opacity-40 transition-colors"
-                                  title="Delete policy"
-                                >
-                                  {deletingId === p.id
-                                    ? <span className="w-3 h-3 border-2 border-red-300 border-t-red-600 rounded-full animate-spin inline-block" />
-                                    : <Trash2 className="w-3 h-3" />}
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+            <div className="relative" style={{ minHeight: 48 }}>
+              <div style={{ opacity: loading ? 0 : 1, transition: 'opacity 0.18s ease', pointerEvents: loading ? 'none' : 'auto' }}>
+                {policies.length === 0 ? (
+                  <p className="text-xs text-[#9CA3AF] py-4 text-center border border-dashed border-[#E5E7EB] rounded-xl">
+                    No policies added yet
+                  </p>
+                ) : (
+                  <div className="rounded-xl border border-[#E5E7EB] overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="bg-[#F9FAFB] border-b border-[#E5E7EB]">
+                          <th className="px-3 py-2 text-left font-semibold text-[#6B7280]">Policy No.</th>
+                          <th className="px-3 py-2 text-right font-semibold text-[#6B7280]">Premium (₹)</th>
+                          <th className="px-3 py-2 text-center font-semibold text-[#6B7280]">Maturity</th>
+                          <th className="px-1 py-2 w-14" />
+                        </tr>
+                      </thead>
+                    </table>
+                    <div className="overflow-y-auto" style={{ maxHeight: 66 }}>
+                      <table className="w-full text-xs">
+                        <tbody>
+                          {policies.map((p, i) => {
+                            const beingEdited = editingId === p.id;
+                            return (
+                              <tr
+                                key={p.id}
+                                className={`border-b border-[#F3F4F6] last:border-0 ${beingEdited ? 'bg-[#EFF6FF]' : i % 2 === 1 ? 'bg-[#FAFAFA]' : ''}`}
+                              >
+                                <td className="px-3 py-2 font-mono font-medium text-[#111827]">{p.policyNumber}</td>
+                                <td className="px-3 py-2 text-right font-mono text-[#374151]">
+                                  {p.premiumAmount.toLocaleString('en-IN')}
+                                </td>
+                                <td className="px-3 py-2 text-center font-mono text-[#374151]">
+                                  {fmtDate(p.maturityDate)}
+                                </td>
+                                <td className="px-1 py-2">
+                                  <div className="flex items-center justify-center gap-0.5">
+                                    <button
+                                      onClick={() => beingEdited ? resetForm() : startEdit(p)}
+                                      className={`p-1 rounded transition-colors ${beingEdited ? 'text-[#2563EB] bg-[#DBEAFE]' : 'text-[#6B7280] hover:bg-[#F3F4F6]'}`}
+                                      title={beingEdited ? 'Cancel edit' : 'Edit'}
+                                    >
+                                      <Pencil className="w-3 h-3" />
+                                    </button>
+                                    <button
+                                      onClick={() => void handleDelete(p)}
+                                      disabled={deletingId === p.id}
+                                      className="p-1 rounded text-[#DC2626] hover:bg-[#FEF2F2] disabled:opacity-40 transition-colors"
+                                      title="Delete policy"
+                                    >
+                                      {deletingId === p.id
+                                        ? <span className="w-3 h-3 border-2 border-red-300 border-t-red-600 rounded-full animate-spin inline-block" />
+                                        : <Trash2 className="w-3 h-3" />}
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
+              {loading && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <span className="inline-block w-5 h-5 rounded-full border-2 border-sky-200 border-t-sky-500 animate-spin" />
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Add / Edit form */}

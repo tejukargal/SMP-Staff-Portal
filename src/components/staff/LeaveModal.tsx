@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Plus, Trash2, Pencil, CalendarDays, Wallet } from 'lucide-react';
-import { Spinner } from '@/components/ui/Spinner';
 import {
   getLeaveBalance,
   updateLeaveBalance,
@@ -269,29 +268,34 @@ export function LeaveModal({ open, staff, onClose }: Props) {
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 min-h-0">
-          {loading ? (
-            <div className="flex justify-center py-10"><Spinner /></div>
-          ) : tab === 'balances' ? (
-            <BalancesTab balance={balance} onChange={setBalance} />
-          ) : (
-            <RecordsTab
-              records={records}
-              form={form}
-              dateErrors={dateErrors}
-              previewDays={previewDays}
-              error={error}
-              submitting={submitting}
-              deletingId={deletingId}
-              editingRecord={editingRecord}
-              isEditing={isEditing}
-              onChange={(f) => { setForm(f); setError(''); }}
-              onAdd={() => void handleAddRecord()}
-              onUpdate={() => void handleUpdateRecord()}
-              onStartEdit={startEdit}
-              onCancelEdit={cancelEdit}
-              onDelete={(r) => void handleDeleteRecord(r)}
-            />
+        <div className="flex-1 overflow-y-auto px-5 py-4 min-h-0 relative">
+          <div style={{ opacity: loading ? 0 : 1, transition: 'opacity 0.18s ease', pointerEvents: loading ? 'none' : 'auto' }}>
+            {tab === 'balances' ? (
+              <BalancesTab balance={balance} onChange={setBalance} />
+            ) : (
+              <RecordsTab
+                records={records}
+                form={form}
+                dateErrors={dateErrors}
+                previewDays={previewDays}
+                error={error}
+                submitting={submitting}
+                deletingId={deletingId}
+                editingRecord={editingRecord}
+                isEditing={isEditing}
+                onChange={(f) => { setForm(f); setError(''); }}
+                onAdd={() => void handleAddRecord()}
+                onUpdate={() => void handleUpdateRecord()}
+                onStartEdit={startEdit}
+                onCancelEdit={cancelEdit}
+                onDelete={(r) => void handleDeleteRecord(r)}
+              />
+            )}
+          </div>
+          {loading && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <span className="inline-block w-5 h-5 rounded-full border-2 border-sky-200 border-t-sky-500 animate-spin" />
+            </div>
           )}
         </div>
 
