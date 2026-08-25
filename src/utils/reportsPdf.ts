@@ -1,7 +1,8 @@
 import { jsPDF } from 'jspdf';
-import { autoTable } from 'jspdf-autotable';
-import type { StaffRecord } from '@/types';
+import { autoTable, type CellHookData } from 'jspdf-autotable';
+import type { StaffRecord, SalarySlip } from '@/types';
 import { formatDate, computeServiceYears } from './dateUtils';
+import { buildLicRow, type LicRow } from './salaryUtils';
 
 // ── Shared constants ──────────────────────────────────────────────────────────
 
@@ -57,13 +58,13 @@ function drawHeader(doc: jsPDF, title: string, subtitle: string) {
   doc.line(MARGIN, 28, pageW - MARGIN, 28);
 }
 
-type ColDef = {
+type ColDef<T> = {
   header: string;
   halign: 'left' | 'center' | 'right';
-  get: (s: StaffRecord, i: number) => string | number;
+  get: (s: T, i: number) => string | number;
 };
 
-function measureColWidths(doc: jsPDF, cols: ColDef[], rows: StaffRecord[], usableW: number, flexIdx: number) {
+function measureColWidths<T>(doc: jsPDF, cols: ColDef<T>[], rows: T[], usableW: number, flexIdx: number) {
   doc.setFontSize(FONT_SIZE);
   let fixed = 0;
   const widths = cols.map((col, idx) => {
@@ -80,13 +81,14 @@ function measureColWidths(doc: jsPDF, cols: ColDef[], rows: StaffRecord[], usabl
   return widths;
 }
 
-function buildTable(
+function buildTable<T>(
   doc: jsPDF,
-  cols: ColDef[],
-  rows: StaffRecord[],
+  cols: ColDef<T>[],
+  rows: T[],
   widths: number[],
   startY: number,
   landscape = false,
+  didParseCell?: (data: CellHookData) => void,
 ) {
   const usableW = (landscape ? 297 : 210) - MARGIN * 2;
   const tableW  = widths.reduce((s, w) => s + w, 0);
@@ -110,6 +112,7 @@ function buildTable(
     headStyles: { fillColor: HEAD_COLOR, textColor: 255, fontStyle: 'bold', fontSize: FONT_SIZE },
     alternateRowStyles: { fillColor: ALT_COLOR },
     columnStyles: colStyles,
+    didParseCell,
     didDrawPage: data => pageFooter(doc, data.pageNumber),
   });
 }
@@ -133,7 +136,7 @@ export function exportStaffListPdf(staff: StaffRecord[], filters: {
 
   drawHeader(doc, 'Staff List', chips.join('  ·  '));
 
-  const cols: ColDef[] = [
+  const cols: ColDef<StaffRecord>[] = [
     { header: 'Sl',          halign: 'center', get: (_, i) => i + 1         },
     { header: 'Name',        halign: 'left',   get: s => s.name             },
     { header: 'Emp ID',      halign: 'left',   get: s => s.empId            },
@@ -166,7 +169,7 @@ export function exportRetiredStaffPdf(staff: StaffRecord[], filters: { search?: 
 
   drawHeader(doc, 'Retired Staff List', chips.join('  ·  '));
 
-  const cols: ColDef[] = [
+  const cols: ColDef<StaffRecord>[] = [
     { header: 'Sl',          halign: 'center', get: (_, i) => i + 1         },
     { header: 'Name',        halign: 'left',   get: s => s.name             },
     { header: 'Emp ID',      halign: 'left',   get: s => s.empId            },
@@ -196,7 +199,7 @@ export function exportServiceRegisterPdf(staff: StaffRecord[], filters: { search
 
   drawHeader(doc, 'Service Register', chips.join('  ·  '));
 
-  const cols: ColDef[] = [
+  const cols: ColDef<StaffRecord>[] = [
     { header: 'Sl',           halign: 'center', get: (_, i) => i + 1               },
     { header: 'Name',         halign: 'left',   get: s => s.name                   },
     { header: 'Emp ID',       halign: 'left',   get: s => s.empId                  },
@@ -227,7 +230,7 @@ export function exportSeniorityListPdf(staff: StaffRecord[], filters: { search?:
 
   drawHeader(doc, 'Seniority List', chips.join('  ·  '));
 
-  const cols: ColDef[] = [
+  const cols: ColDef<StaffRecord>[] = [
     { header: 'Sl',          halign: 'center', get: (_, i) => i + 1         },
     { header: 'Name',        halign: 'left',   get: s => s.name             },
     { header: 'Designation', halign: 'left',   get: s => s.designation      },
@@ -257,7 +260,7 @@ export function exportByDesignationPdf(staff: StaffRecord[], filters: { search?:
 
   drawHeader(doc, 'Staff by Designation', chips.join('  ·  '));
 
-  const cols: ColDef[] = [
+  const cols: ColDef<StaffRecord>[] = [
     { header: 'Sl',          halign: 'center', get: (_, i) => i + 1         },
     { header: 'Name',        halign: 'left',   get: s => s.name             },
     { header: 'Emp ID',      halign: 'left',   get: s => s.empId            },
@@ -320,7 +323,7 @@ export function exportContactDirPdf(staff: StaffRecord[], filters: { search?: st
 
   drawHeader(doc, 'Contact Directory', chips.join('  ·  '));
 
-  const cols: ColDef[] = [
+  const cols: ColDef<StaffRecord>[] = [
     { header: 'Sl',    halign: 'center', get: (_, i) => i + 1   },
     { header: 'Name',  halign: 'left',   get: s => s.name        },
     { header: 'Type',  halign: 'center', get: s => s.type        },
@@ -335,17 +338,61 @@ export function exportContactDirPdf(staff: StaffRecord[], filters: { search?: st
   doc.save('SMP_Contact_Directory.pdf');
 }
 
+// ── LIC 6.25% PDF ─────────────────────────────────────────────────────────────
+
+export function exportLicPdf(
+  staff: StaffRecord[],
+  filters: { search?: string },
+  slipMap: Map<string, SalarySlip>,
+): void {
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const usableW = 297 - MARGIN * 2;
+
+  const rows = staff.map(s => buildLicRow(s, slipMap));
+
+  const chips: string[] = [];
+  if (filters.search) chips.push(`"${filters.search}"`);
+  chips.push(`${rows.length} record${rows.length !== 1 ? 's' : ''}`);
+
+  drawHeader(doc, 'LIC 6.25% Report', chips.join('  ·  '));
+
+  const cols: ColDef<LicRow>[] = [
+    { header: 'Sl',            halign: 'center', get: (_, i) => i + 1                         },
+    { header: 'Emp ID',        halign: 'left',   get: r => r.empId                             },
+    { header: 'Name',          halign: 'left',   get: r => r.name                              },
+    { header: 'Month',         halign: 'center', get: r => r.month || '—'                      },
+    { header: 'Year',          halign: 'center', get: r => r.year || '—'                       },
+    { header: 'Pay Scale',     halign: 'left',   get: r => r.payScale || '—'                   },
+    { header: 'LIC Deduction', halign: 'right',  get: r => r.lic === '' ? '—' : r.lic           },
+    { header: '6.25% of LIC',  halign: 'right',  get: r => r.lic625 === '' ? '—' : r.lic625     },
+    { header: 'Difference',    halign: 'right',  get: r => r.difference === '' ? '—' : r.difference },
+    { header: 'Status',        halign: 'center', get: r => r.status || '—'                     },
+  ];
+  const statusColIdx = cols.length - 1;
+
+  const measure = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const widths  = measureColWidths(measure, cols, rows, usableW, 2); // flex: Name
+  buildTable(doc, cols, rows, widths, 31, true, data => {
+    if (data.section === 'body' && data.column.index === statusColIdx) {
+      if (data.cell.raw === 'SHORT') { data.cell.styles.textColor = [220, 38, 38]; data.cell.styles.fontStyle = 'bold'; }
+      else if (data.cell.raw === 'OK') { data.cell.styles.textColor = [21, 128, 61]; }
+    }
+  });
+  doc.save('SMP_LIC_625.pdf');
+}
+
 // ── Dispatch helper — picks the right exporter per report key ─────────────────
 
 export type ReportKey =
   | 'staff-list' | 'retired' | 'service-register'
   | 'seniority'  | 'by-designation' | 'contact-dir'
-  | 'dor-list';
+  | 'dor-list'   | 'lic-625';
 
 export function exportReportPdf(
   key: ReportKey,
   data: StaffRecord[],
   filters: { search?: string; dept?: string; type?: string; status?: string; desig?: string; category?: string },
+  slipMap?: Map<string, SalarySlip>,
 ): void {
   switch (key) {
     case 'staff-list':       return exportStaffListPdf(data, filters);
@@ -355,5 +402,6 @@ export function exportReportPdf(
     case 'by-designation':   return exportByDesignationPdf(data, filters);
     case 'contact-dir':      return exportContactDirPdf(data, filters);
     case 'dor-list':         return exportServiceRegisterPdf(data, filters);
+    case 'lic-625':          return exportLicPdf(data, filters, slipMap ?? new Map());
   }
 }

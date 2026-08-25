@@ -9,7 +9,9 @@ import { Table, Thead, Th, Tr, Td } from '@/components/ui/Table';
 import { formatDate, computeServiceYears, computeDOR } from '@/utils/dateUtils';
 import { exportStaffToExcel, exportReportToExcel } from '@/utils/exportUtils';
 import { exportReportPdf } from '@/utils/reportsPdf';
-import type { StaffRecord } from '@/types';
+import { buildLatestSlipMap, buildLicRow } from '@/utils/salaryUtils';
+import { getAllSalarySlips } from '@/firebase/firestore';
+import type { StaffRecord, SalarySlip } from '@/types';
 import { DEPARTMENTS, STATUSES, DESIGNATIONS, DEPT_COLORS } from '@/constants/enums';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -21,7 +23,8 @@ type ReportKey =
   | 'seniority'
   | 'by-designation'
   | 'contact-dir'
-  | 'dor-list';
+  | 'dor-list'
+  | 'lic-625';
 
 interface ReportDef { key: ReportKey; label: string; title: string; }
 
@@ -33,6 +36,7 @@ const REPORTS: ReportDef[] = [
   { key: 'by-designation',   label: 'By Designation',   title: 'Staff by Designation' },
   { key: 'contact-dir',      label: 'Contact Directory',title: 'Contact Directory' },
   { key: 'dor-list',         label: 'DOR List',         title: 'Date of Retirement List' },
+  { key: 'lic-625',          label: 'LIC 6.25%',        title: 'LIC 6.25% Report' },
 ];
 
 // ── Base dataset per report ────────────────────────────────────────────────────
@@ -40,6 +44,7 @@ const REPORTS: ReportDef[] = [
 function getBaseData(key: ReportKey, staff: StaffRecord[]): StaffRecord[] {
   switch (key) {
     case 'retired':          return staff.filter(s => s.status === 'RTRD').sort((a, b) => a.name.localeCompare(b.name));
+    case 'lic-625':          return staff.filter(s => s.status === 'IN SERVICE').sort((a, b) => a.sl - b.sl);
     case 'service-register':
     case 'seniority':        return [...staff].sort((a, b) => a.doe.localeCompare(b.doe));
     case 'by-designation':   return [...staff].sort((a, b) => a.designation.localeCompare(b.designation) || a.name.localeCompare(b.name));
@@ -53,7 +58,11 @@ function getBaseData(key: ReportKey, staff: StaffRecord[]): StaffRecord[] {
   }
 }
 
-function toExportRow(key: ReportKey, s: StaffRecord): Record<string, unknown> {
+function toExportRow(key: ReportKey, s: StaffRecord, slipMap: Map<string, SalarySlip> = new Map()): Record<string, unknown> {
+  if (key === 'lic-625') {
+    const r = buildLicRow(s, slipMap);
+    return { 'EMP ID': r.empId, NAME: r.name, MONTH: r.month, YEAR: r.year, 'PAY SCALE': r.payScale, 'LIC DEDUCTION': r.lic, '6.25% OF LIC': r.lic625, DIFFERENCE: r.difference, STATUS: r.status };
+  }
   if (key === 'dor-list')
     return { NAME: s.name, 'EMP ID': s.empId, DESIGNATION: s.designation, DEPT: s.dept, STATUS: s.status, DOB: formatDate(s.dob), DOR: formatDate(computeDOR(s.dob) || s.dor) };
   if (key === 'contact-dir')
@@ -77,6 +86,11 @@ export default function Reports() {
   const [fStatus,      setFStat]   = useState('');
   const [fDesig,       setFDesig]  = useState('');
   const [fCategory,    setFCat]    = useState('');
+
+  // ── Salary slips (for LIC 6.25% report) ──────────────────────────────────────
+  const [slips, setSlips] = useState<SalarySlip[]>([]);
+  useEffect(() => { getAllSalarySlips().then(setSlips).catch(() => {}); }, []);
+  const slipMap = useMemo(() => buildLatestSlipMap(slips), [slips]);
 
   // ── Tab scroll ──────────────────────────────────────────────────────────────
   const tabsRef  = useRef<HTMLDivElement>(null);
@@ -155,7 +169,7 @@ export default function Reports() {
     if (active === 'staff-list') {
       exportStaffToExcel(displayData, 'SMP_Staff_List');
     } else {
-      exportReportToExcel(displayData.map(s => toExportRow(active, s)), activeDef.title, `SMP_${active}`);
+      exportReportToExcel(displayData.map(s => toExportRow(active, s, slipMap)), activeDef.title, `SMP_${active}`);
     }
   };
 
@@ -167,7 +181,7 @@ export default function Reports() {
       status: fStatus || undefined,
       desig: fDesig || undefined,
       category: fCategory || undefined,
-    }), 0);
+    }, slipMap), 0);
   };
 
   if (loading) return <PageSpinner />;
@@ -255,14 +269,16 @@ export default function Reports() {
 
         <div className="w-px h-4 bg-sky-100 shrink-0" />
 
-        {/* Dept */}
-        <select value={fDept} onChange={e => setFDept(e.target.value)} className={SEL}>
-          <option value="">All Depts</option>
-          {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
-        </select>
+        {/* Dept — hidden on LIC 6.25% tab (implicitly scoped to IN SERVICE staff) */}
+        {active !== 'lic-625' && (
+          <select value={fDept} onChange={e => setFDept(e.target.value)} className={SEL}>
+            <option value="">All Depts</option>
+            {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+        )}
 
-        {/* Type — hidden on retired tab (mostly non-teaching irrelevant distinction) */}
-        {active !== 'retired' && (
+        {/* Type — hidden on retired & LIC 6.25% tabs */}
+        {active !== 'retired' && active !== 'lic-625' && (
           <select value={fType} onChange={e => setFType(e.target.value)} className={SEL}>
             <option value="">All Types</option>
             <option value="TEACHING">Teaching</option>
@@ -270,22 +286,24 @@ export default function Reports() {
           </select>
         )}
 
-        {/* Status — hidden on retired tab */}
-        {active !== 'retired' && (
+        {/* Status — hidden on retired & LIC 6.25% tabs */}
+        {active !== 'retired' && active !== 'lic-625' && (
           <select value={fStatus} onChange={e => setFStat(e.target.value)} className={SEL}>
             <option value="">All Statuses</option>
             {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         )}
 
-        {/* Designation */}
-        <select value={fDesig} onChange={e => setFDesig(e.target.value)} className={SEL}>
-          <option value="">All Designations</option>
-          {DESIGNATIONS.map(d => <option key={d} value={d}>{d}</option>)}
-        </select>
+        {/* Designation — hidden on LIC 6.25% tab */}
+        {active !== 'lic-625' && (
+          <select value={fDesig} onChange={e => setFDesig(e.target.value)} className={SEL}>
+            <option value="">All Designations</option>
+            {DESIGNATIONS.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+        )}
 
-        {/* Category — only shown when categories exist in data */}
-        {categoryOptions.length > 0 && (
+        {/* Category — only shown when categories exist in data, hidden on LIC 6.25% tab */}
+        {categoryOptions.length > 0 && active !== 'lic-625' && (
           <select value={fCategory} onChange={e => setFCat(e.target.value)} className={SEL}>
             <option value="">All Categories</option>
             {categoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
@@ -354,7 +372,7 @@ export default function Reports() {
         />
       ) : (
         <div className="flex-1 min-h-0 overflow-y-auto">
-          <ReportTable reportKey={active} data={displayData} />
+          <ReportTable reportKey={active} data={displayData} slipMap={slipMap} />
         </div>
       )}
 
@@ -364,9 +382,49 @@ export default function Reports() {
 
 // ── Report renderers ────────────────────────────────────────────────────────────
 
-function ReportTable({ reportKey, data }: { reportKey: ReportKey; data: StaffRecord[] }) {
+function ReportTable({ reportKey, data, slipMap }: { reportKey: ReportKey; data: StaffRecord[]; slipMap: Map<string, SalarySlip> }) {
   if (data.length === 0) {
     return <div className="py-16 text-center text-sm text-gray-300">No records match the current filters</div>;
+  }
+
+  if (reportKey === 'lic-625') {
+    return (
+      <Table>
+        <Thead>
+          <tr>
+            <Th>Sl</Th><Th>Emp ID</Th><Th>Name</Th><Th className="text-center">Month</Th>
+            <Th className="text-center">Year</Th><Th>Pay Scale</Th><Th className="text-right">LIC Deduction</Th>
+            <Th className="text-right">6.25% of LIC</Th><Th className="text-right">Difference</Th><Th className="text-center">Status</Th>
+          </tr>
+        </Thead>
+        <tbody>
+          {data.map((s, i) => {
+            const r = buildLicRow(s, slipMap);
+            const diffColor = typeof r.difference === 'number' && r.difference !== 0 ? 'text-amber-600' : 'text-gray-700';
+            return (
+              <Tr key={s.id}>
+                <Td className="font-mono text-xs text-gray-400 w-10">{i + 1}</Td>
+                <Td className="font-mono text-xs">{r.empId}</Td>
+                <Td className="font-medium">{r.name}</Td>
+                <Td className="text-xs text-center">{r.month || '—'}</Td>
+                <Td className="text-xs text-center font-mono">{r.year || '—'}</Td>
+                <Td className="font-mono text-xs">{r.payScale || '—'}</Td>
+                <Td className="text-right tabular-nums">{r.lic === '' ? '—' : r.lic}</Td>
+                <Td className="text-right tabular-nums">{r.lic625 === '' ? '—' : r.lic625}</Td>
+                <Td className={`text-right tabular-nums font-semibold ${diffColor}`}>{r.difference === '' ? '—' : r.difference}</Td>
+                <Td className="text-center">
+                  {r.status === 'SHORT' ? (
+                    <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700">SHORT</span>
+                  ) : r.status === 'OK' ? (
+                    <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700">OK</span>
+                  ) : '—'}
+                </Td>
+              </Tr>
+            );
+          })}
+        </tbody>
+      </Table>
+    );
   }
 
   if (reportKey === 'dor-list') {
