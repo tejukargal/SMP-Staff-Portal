@@ -371,9 +371,7 @@ export default function Reports() {
           className="flex-1 min-h-0"
         />
       ) : (
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          <ReportTable reportKey={active} data={displayData} slipMap={slipMap} />
-        </div>
+        <ReportTable reportKey={active} data={displayData} slipMap={slipMap} className="flex-1 min-h-0" />
       )}
 
     </div>
@@ -382,14 +380,14 @@ export default function Reports() {
 
 // ── Report renderers ────────────────────────────────────────────────────────────
 
-function ReportTable({ reportKey, data, slipMap }: { reportKey: ReportKey; data: StaffRecord[]; slipMap: Map<string, SalarySlip> }) {
+function ReportTable({ reportKey, data, slipMap, className }: { reportKey: ReportKey; data: StaffRecord[]; slipMap: Map<string, SalarySlip>; className?: string }) {
   if (data.length === 0) {
     return <div className="py-16 text-center text-sm text-gray-300">No records match the current filters</div>;
   }
 
   if (reportKey === 'lic-625') {
     return (
-      <Table>
+      <Table className={className}>
         <Thead>
           <tr>
             <Th>Sl</Th><Th>Emp ID</Th><Th>Name</Th><Th className="text-center">Month</Th>
@@ -429,7 +427,7 @@ function ReportTable({ reportKey, data, slipMap }: { reportKey: ReportKey; data:
 
   if (reportKey === 'dor-list') {
     return (
-      <Table>
+      <Table className={className}>
         <Thead>
           <tr>
             <Th>Sl</Th><Th>Name</Th><Th>Emp ID</Th><Th>Designation</Th>
@@ -459,7 +457,7 @@ function ReportTable({ reportKey, data, slipMap }: { reportKey: ReportKey; data:
 
   if (reportKey === 'contact-dir') {
     return (
-      <Table>
+      <Table className={className}>
         <Thead><tr><Th>Sl</Th><Th>Name</Th><Th>Type</Th><Th>Dept</Th><Th>Phone</Th><Th>Email</Th></tr></Thead>
         <tbody>
           {data.map((s, i) => (
@@ -479,7 +477,7 @@ function ReportTable({ reportKey, data, slipMap }: { reportKey: ReportKey; data:
 
   if (reportKey === 'service-register') {
     return (
-      <Table>
+      <Table className={className}>
         <Thead><tr><Th>Sl</Th><Th>Name</Th><Th>Emp ID</Th><Th>Dept</Th><Th className="text-center">DOB</Th><Th className="text-center">DOE</Th><Th className="text-center">DOR</Th><Th>Service Years</Th></tr></Thead>
         <tbody>
           {data.map((s, i) => {
@@ -506,23 +504,23 @@ function ReportTable({ reportKey, data, slipMap }: { reportKey: ReportKey; data:
     const groups: Record<string, StaffRecord[]> = {};
     data.forEach(s => { if (!groups[s.designation]) groups[s.designation] = []; groups[s.designation].push(s); });
     return (
-      <div className="flex flex-col gap-5">
+      <div className={`flex flex-col gap-5 overflow-y-auto ${className ?? ''}`}>
         {Object.entries(groups).map(([group, members]) => (
           <div key={group}>
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">{group}</p>
-            <StaffMiniTable data={members} />
+            <StaffMiniTable data={members} scroll={false} />
           </div>
         ))}
       </div>
     );
   }
 
-  return <StaffMiniTable data={data} />;
+  return <StaffMiniTable data={data} className={className} />;
 }
 
-function StaffMiniTable({ data }: { data: StaffRecord[] }) {
+function StaffMiniTable({ data, className, scroll }: { data: StaffRecord[]; className?: string; scroll?: boolean }) {
   return (
-    <Table>
+    <Table className={className} scroll={scroll}>
       <Thead>
         <tr>
           <Th>Sl</Th><Th>Name</Th><Th>Emp ID</Th><Th>Designation</Th>

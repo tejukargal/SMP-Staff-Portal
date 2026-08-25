@@ -3,12 +3,15 @@ import React from 'react';
 interface TableProps {
   children: React.ReactNode;
   className?: string;
+  /** Whether this Table owns its own scroll container (needed for its sticky header to work).
+   *  Set to false when an ancestor already scrolls — nesting two scroll containers breaks `sticky`. */
+  scroll?: boolean;
 }
 
-export function Table({ children, className = '' }: TableProps) {
+export function Table({ children, className = '', scroll = true }: TableProps) {
   return (
     <div
-      className={`overflow-auto rounded-2xl border border-sky-100 bg-white/80 ${className}`}
+      className={`${scroll ? 'overflow-auto' : ''} rounded-2xl border border-sky-100 bg-white/80 ${className}`}
       style={{ boxShadow: '0 1px 4px 0 rgba(14,165,233,0.06)' }}
     >
       <table className="w-full text-sm border-collapse table-striped">
