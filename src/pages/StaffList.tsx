@@ -8,6 +8,7 @@ import { StaffTable } from '@/components/staff/StaffTable';
 import { ImportModal } from '@/components/staff/ImportModal';
 import { LeaveModal } from '@/components/staff/LeaveModal';
 import { LicModal } from '@/components/staff/LicModal';
+import { SalaryCertificateModal } from '@/components/staff/SalaryCertificateModal';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
@@ -35,6 +36,7 @@ export default function StaffList() {
   const [importOpen, setImportOpen] = useState(false);
   const [leaveTarget, setLeaveTarget] = useState<StaffRecord | null>(null);
   const [licTarget, setLicTarget]     = useState<StaffRecord | null>(null);
+  const [certTarget, setCertTarget]   = useState<StaffRecord | null>(null);
 
   const filtered = useMemo(() => {
     const q = filters.search.trim().toUpperCase();
@@ -165,6 +167,7 @@ export default function StaffList() {
         onDelete={(s) => setDeleteTarget(s)}
         onLeave={(s) => setLeaveTarget(s)}
         onLic={(s) => setLicTarget(s)}
+        onCertificate={(s) => setCertTarget(s)}
         className="flex-1 min-h-0"
       />
 
@@ -197,6 +200,13 @@ export default function StaffList() {
         open={licTarget !== null}
         staff={licTarget}
         onClose={() => setLicTarget(null)}
+      />
+
+      {/* Salary Certificate modal */}
+      <SalaryCertificateModal
+        open={certTarget !== null}
+        staff={certTarget}
+        onClose={() => setCertTarget(null)}
       />
 
       {/* Import modal */}

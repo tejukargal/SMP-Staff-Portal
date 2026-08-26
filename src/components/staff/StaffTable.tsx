@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, Pencil, Trash2, CalendarDays, ShieldCheck } from 'lucide-react';
+import { Eye, Pencil, Trash2, CalendarDays, ShieldCheck, FileText } from 'lucide-react';
 import { Table, Thead, Th, Tr, Td } from '@/components/ui/Table';
 import { DeptBadge, StatusBadge } from '@/components/ui/Badge';
 import { SkeletonRow } from '@/components/ui/Spinner';
@@ -14,6 +14,7 @@ interface Props {
   onDelete: (staff: StaffRecord) => void;
   onLeave: (staff: StaffRecord) => void;
   onLic?: (staff: StaffRecord) => void;
+  onCertificate?: (staff: StaffRecord) => void;
   startIndex?: number;
   className?: string;
 }
@@ -24,7 +25,7 @@ interface ContextMenu {
   record: StaffRecord;
 }
 
-export function StaffTable({ staff, loading, isAdmin, onDelete, onLeave, onLic, startIndex = 1, className }: Props) {
+export function StaffTable({ staff, loading, isAdmin, onDelete, onLeave, onLic, onCertificate, startIndex = 1, className }: Props) {
   const navigate = useNavigate();
   const [ctx, setCtx] = useState<ContextMenu | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -51,7 +52,7 @@ export function StaffTable({ staff, loading, isAdmin, onDelete, onLeave, onLic, 
     e.preventDefault();
     // Clamp so menu doesn't overflow viewport
     const menuW = 180;
-    const menuH = isAdmin ? 220 : 42;
+    const menuH = isAdmin ? 258 : 80;
     const x = Math.min(e.clientX, window.innerWidth  - menuW - 8);
     const y = Math.min(e.clientY, window.innerHeight - menuH - 8);
     setCtx({ x, y, record });
@@ -117,6 +118,13 @@ export function StaffTable({ staff, loading, isAdmin, onDelete, onLeave, onLic, 
           >
             <Eye className="w-3.5 h-3.5 text-[#6B7280]" />
             View
+          </button>
+          <button
+            onClick={() => { onCertificate?.(ctx.record); setCtx(null); }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 text-left text-[#374151] hover:bg-[#F7F8FA] transition-colors"
+          >
+            <FileText className="w-3.5 h-3.5 text-[#6B7280]" />
+            Sal Cert Appln
           </button>
           {isAdmin && (
             <>
