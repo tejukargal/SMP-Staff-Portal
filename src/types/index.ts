@@ -202,6 +202,18 @@ export interface SalaryGrant {
   updatedBy?: string;
 }
 
+export interface SalaryDeduction {
+  id?: string;
+  monthYear: string;
+  month: string;
+  year: number;
+  head: string;
+  paymentDate: string;
+  challanNo: string;
+  updatedAt?: Timestamp;
+  updatedBy?: string;
+}
+
 export interface SalarySlip {
   id?: string;
   staffId: string;

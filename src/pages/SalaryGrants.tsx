@@ -4,9 +4,13 @@ import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/hooks/useAuth';
-import { MONTHS } from '@/constants/enums';
-import { getAllSalarySlips, getAllSalaryGrants, upsertSalaryGrant } from '@/firebase/firestore';
-import type { SalarySlip, SalaryGrant } from '@/types';
+import { useRole } from '@/hooks/useRole';
+import { MONTHS, DEDUCTION_HEADS } from '@/constants/enums';
+import {
+  getAllSalarySlips, getAllSalaryGrants, upsertSalaryGrant,
+  getAllSalaryDeductions, upsertSalaryDeduction,
+} from '@/firebase/firestore';
+import type { SalarySlip, SalaryGrant, SalaryDeduction } from '@/types';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -71,6 +75,14 @@ interface GrantRow {
   aggr: SlipAggregate | null;
   grant: SalaryGrant | null;
 }
+
+interface DeductionRow {
+  key: string; sl: number; head: string; month: string; year: number;
+  noOfStaff: number; amount: number; receivedDate: string;
+  saved: SalaryDeduction | null;
+}
+
+interface DeductionEditDraft { paymentDate: string; challanNo: string; }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -202,16 +214,24 @@ const INPUT_BASE =
 
 export default function SalaryGrants() {
   const { user }      = useAuth();
+  const { isAdmin }   = useRole();
   const { showToast } = useToast();
+
+  const [activeTab,    setActiveTab]    = useState<'grants' | 'deductions'>('grants');
 
   const [slips,        setSlips]        = useState<SalarySlip[]>([]);
   const [grants,       setGrants]       = useState<SalaryGrant[]>([]);
+  const [deductions,   setDeductions]   = useState<SalaryDeduction[]>([]);
   const [loading,      setLoading]      = useState(true);
   const [editingKey,   setEditingKey]   = useState<string | null>(null);
   const [editDraft,    setEditDraft]    = useState<EditDraft | null>(null);
   const [saving,       setSaving]       = useState(false);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [extraKeys,    setExtraKeys]    = useState<Set<string>>(new Set());
+
+  const [dedEditingKey, setDedEditingKey] = useState<string | null>(null);
+  const [dedEditDraft,  setDedEditDraft]  = useState<DeductionEditDraft | null>(null);
+  const [dedSaving,     setDedSaving]     = useState(false);
 
   const [filterMode,     setFilterMode]     = useState<'single' | 'range'>('single');
   const [filterYear,     setFilterYear]     = useState('');
@@ -224,9 +244,10 @@ export default function SalaryGrants() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [s, g] = await Promise.all([getAllSalarySlips(), getAllSalaryGrants()]);
+      const [s, g, d] = await Promise.all([getAllSalarySlips(), getAllSalaryGrants(), getAllSalaryDeductions()]);
       setSlips(s);
       setGrants(g);
+      setDeductions(d);
     } catch {
       showToast('error', 'Failed to load salary data');
     } finally {
@@ -290,6 +311,33 @@ export default function SalaryGrants() {
     });
   }, [rows, filterMode, filterYear, filterMonth, rangeFromYear, rangeFromMonth, rangeToYear, rangeToMonth]);
 
+  const deductionMap = useMemo(() => {
+    const m = new Map<string, SalaryDeduction>();
+    deductions.forEach(d => m.set(`${d.monthYear}_${d.head}`, d));
+    return m;
+  }, [deductions]);
+
+  const deductionRows = useMemo((): DeductionRow[] => {
+    let sl = 0;
+    const out: DeductionRow[] = [];
+    for (const row of visibleRows) {
+      const src = row.grant ?? row.aggr;
+      if (!src) continue;
+      for (const head of DEDUCTION_HEADS) {
+        sl++;
+        const key = `${row.key}_${head.label}`;
+        out.push({
+          key, sl, head: head.label, month: row.month, year: row.year,
+          noOfStaff: src.staffCount ?? 0,
+          amount: (src as unknown as Record<string, number>)[head.key] ?? 0,
+          receivedDate: row.grant?.deductionsReceivedDate ?? '',
+          saved: deductionMap.get(key) ?? null,
+        });
+      }
+    }
+    return out;
+  }, [visibleRows, deductionMap]);
+
   const hasActiveFilter = filterMode === 'single'
     ? !!(filterYear || filterMonth)
     : !!(rangeFromYear || rangeFromMonth || rangeToYear || rangeToMonth);
@@ -335,6 +383,42 @@ export default function SalaryGrants() {
       showToast('error', 'Failed to save grant record');
     } finally {
       setSaving(false);
+    }
+  }
+
+  function startDedEdit(row: DeductionRow) {
+    setDedEditDraft({
+      paymentDate: isoToDmy(row.saved?.paymentDate ?? ''),
+      challanNo:   row.saved?.challanNo ?? '',
+    });
+    setDedEditingKey(row.key);
+  }
+
+  function cancelDedEdit() {
+    setDedEditingKey(null);
+    setDedEditDraft(null);
+  }
+
+  async function saveDedEdit(row: DeductionRow) {
+    if (!dedEditDraft || !user) return;
+    setDedSaving(true);
+    try {
+      await upsertSalaryDeduction({
+        monthYear:   `${row.month}_${row.year}`,
+        month:       row.month,
+        year:        row.year,
+        head:        row.head,
+        paymentDate: dmyToIso(dedEditDraft.paymentDate),
+        challanNo:   dedEditDraft.challanNo,
+      }, user.uid);
+      showToast('success', `Saved ${row.head} deduction for ${row.month} ${row.year}`);
+      setDedEditingKey(null);
+      setDedEditDraft(null);
+      await loadData();
+    } catch {
+      showToast('error', 'Failed to save deduction record');
+    } finally {
+      setDedSaving(false);
     }
   }
 
@@ -388,9 +472,29 @@ export default function SalaryGrants() {
           )}
         </div>
 
-        <Button size="sm" onClick={() => setAddModalOpen(true)} disabled={!!editingKey}>
-          <Plus className="w-3.5 h-3.5" /> Add Grant Entry
-        </Button>
+        {activeTab === 'grants' && (
+          <Button size="sm" onClick={() => setAddModalOpen(true)} disabled={!!editingKey}>
+            <Plus className="w-3.5 h-3.5" /> Add Grant Entry
+          </Button>
+        )}
+      </div>
+
+      {/* ── Tab bar ── */}
+      <div className="flex-shrink-0 flex items-center gap-1.5">
+        {([
+          { key: 'grants' as const,     label: 'Grants' },
+          { key: 'deductions' as const, label: 'Deductions' },
+        ]).map(t => (
+          <button key={t.key} onClick={() => setActiveTab(t.key)}
+            className={[
+              'cursor-pointer px-3 py-1.5 rounded-lg text-xs font-semibold border whitespace-nowrap transition-all duration-150',
+              activeTab === t.key
+                ? 'bg-sky-600 text-white border-sky-600 shadow-sm'
+                : 'bg-white/80 text-gray-600 border-sky-100 hover:bg-sky-50 hover:border-sky-300 hover:text-sky-700',
+            ].join(' ')}>
+            {t.label}
+          </button>
+        ))}
       </div>
 
       {/* ── Filter bar ── */}
@@ -463,7 +567,8 @@ export default function SalaryGrants() {
         </div>
       )}
 
-      {/* ── Table ── */}
+      {/* ── Grants Table ── */}
+      {activeTab === 'grants' && (
       <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-gray-200 bg-white">
         {rows.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-gray-400">
@@ -802,6 +907,119 @@ export default function SalaryGrants() {
           </table>
         )}
       </div>
+      )}
+
+      {/* ── Deductions Table ── */}
+      {activeTab === 'deductions' && (
+      <div className="flex-1 min-h-0 overflow-auto rounded-xl border border-gray-200 bg-white">
+        {deductionRows.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full gap-3 text-gray-400">
+            <IndianRupee className="w-12 h-12 text-gray-200" />
+            <p className="text-sm font-medium">No deduction data yet</p>
+            <p className="text-xs">Save records in the <strong>Grants</strong> tab first — deduction rows are derived from them.</p>
+          </div>
+        ) : (
+          <table className="text-xs border-collapse w-full">
+            <thead className="sticky top-0 z-20">
+              <tr className="border-b-2 border-gray-200">
+                <th className={`${TH} bg-sky-50/95 text-center`} style={{ minWidth: 44 }}>Sl</th>
+                <th className={`${TH} bg-sky-50/95 text-left`} style={{ minWidth: 90 }}>Deduction Head</th>
+                <th className={`${TH} bg-sky-50/95 text-center`} style={{ minWidth: 70 }}>Year</th>
+                <th className={`${TH} bg-sky-50/95 text-left`} style={{ minWidth: 110 }}>Month</th>
+                <th className={`${TH} bg-sky-50/95 text-center`} style={{ minWidth: 70 }}>No of Staff</th>
+                <th className={`${TH} bg-red-50/95 text-right`} style={{ minWidth: 110 }}>Deduction Amount</th>
+                <th className={`${TH} bg-amber-50/95 text-center`} style={{ minWidth: 130 }}>Ded. Received Date</th>
+                <th className={`${TH} bg-amber-50/95 text-center`} style={{ minWidth: 130 }}>Ded. Payment Date</th>
+                <th className={`${TH} bg-amber-50/95 text-left`} style={{ minWidth: 150 }}>Challan / Ref No.</th>
+                {isAdmin && <th className={`${TH} bg-gray-50/95 text-center`} style={{ minWidth: 100 }}>Action</th>}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {deductionRows.map((row) => {
+                const isEditing = dedEditingKey === row.key;
+                const rowBg = isEditing
+                  ? 'bg-sky-50/50'
+                  : row.saved
+                    ? 'hover:bg-gray-50/50'
+                    : 'bg-amber-50/20 hover:bg-amber-50/40';
+                return (
+                  <tr key={row.key} className={`transition-colors ${rowBg}`}>
+                    <td className={`${TD} text-center text-gray-500`}>{row.sl}</td>
+                    <td className={`${TD} font-semibold text-gray-800`}>{row.head}</td>
+                    <td className={`${TD} text-center text-gray-600`}>{row.year}</td>
+                    <td className={`${TD} text-gray-700`}>{row.month}</td>
+                    <td className={`${TD} text-center text-gray-600`}>{row.noOfStaff}</td>
+                    <td className={`${TD} text-right tabular-nums font-semibold text-red-700`}>{fmt(row.amount)}</td>
+                    <td className={`${TD} text-center`}>
+                      {row.receivedDate
+                        ? <span className="text-gray-700">{fmtDate(row.receivedDate)}</span>
+                        : <span className="text-gray-300">—</span>}
+                    </td>
+                    {isEditing ? (
+                      <>
+                        <td className={TD}>
+                          <input type="text"
+                            value={dedEditDraft?.paymentDate ?? ''}
+                            onChange={(e) => setDedEditDraft(prev => prev ? { ...prev, paymentDate: e.target.value } : prev)}
+                            placeholder="dd/mm/yyyy"
+                            maxLength={10}
+                            className={`${INPUT_BASE} border-amber-300 focus:ring-amber-400 text-center`}
+                          />
+                        </td>
+                        <td className={TD}>
+                          <input type="text"
+                            value={dedEditDraft?.challanNo ?? ''}
+                            onChange={(e) => setDedEditDraft(prev => prev ? { ...prev, challanNo: e.target.value } : prev)}
+                            placeholder="Challan / reference no…"
+                            className={`${INPUT_BASE} border-amber-300 focus:ring-amber-400 text-left`}
+                          />
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className={`${TD} text-center`}>
+                          {row.saved?.paymentDate
+                            ? <span className="text-gray-700">{fmtDate(row.saved.paymentDate)}</span>
+                            : <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className={TD}>
+                          {row.saved?.challanNo
+                            ? <span className="font-medium text-amber-800">{row.saved.challanNo}</span>
+                            : <span className="text-gray-300">—</span>}
+                        </td>
+                      </>
+                    )}
+                    {isAdmin && (
+                      <td className={`${TD} text-center`}>
+                        {isEditing ? (
+                          <div className="flex items-center justify-center gap-1.5">
+                            <Button size="sm" onClick={() => saveDedEdit(row)} loading={dedSaving} disabled={dedSaving}>
+                              <Check className="w-3 h-3" /> Save
+                            </Button>
+                            <button onClick={cancelDedEdit}
+                              className="cursor-pointer p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => startDedEdit(row)}
+                            disabled={!!dedEditingKey}
+                            title="Edit"
+                            className="cursor-pointer p-1.5 text-gray-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+      )}
 
       {addModalOpen && (
         <AddEntryModal

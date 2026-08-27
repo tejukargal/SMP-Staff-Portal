@@ -101,6 +101,14 @@ export const APPOINTMENT_TYPE_LABELS: Record<string, string> = {
   PROMOTION: 'Promotion',
 };
 
+export const DEDUCTION_HEADS = [
+  { key: 'itDeduction', label: 'IT' },
+  { key: 'ptDeduction', label: 'PT' },
+  { key: 'gslic',       label: 'GSLIC' },
+  { key: 'lic',         label: 'LIC' },
+  { key: 'fbf',         label: 'FBF' },
+] as const;
+
 export const VACANCY_REASON_LABELS: Record<string, string> = {
   RETIREMENT:      'Retirement',
   RESIGNATION:     'Resignation',

@@ -20,7 +20,7 @@ import {
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { app } from './config';
-import type { StaffRecord, UserRecord, LeaveBalance, LeaveRecord, LicPolicy, SanctionedPost, VacancyEvent, SalarySlip, SalaryGrant } from '@/types';
+import type { StaffRecord, UserRecord, LeaveBalance, LeaveRecord, LicPolicy, SanctionedPost, VacancyEvent, SalarySlip, SalaryGrant, SalaryDeduction } from '@/types';
 
 export const db = getFirestore(app);
 
@@ -419,6 +419,24 @@ export async function upsertSalaryGrant(
   updatedBy: string,
 ): Promise<void> {
   await setDoc(doc(db, 'salaryGrants', data.monthYear), {
+    ...data,
+    updatedBy,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+// ── Salary Deductions ────────────────────────────────────────────────────────
+
+export async function getAllSalaryDeductions(): Promise<SalaryDeduction[]> {
+  const snap = await getDocs(collection(db, 'salaryDeductions'));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as SalaryDeduction));
+}
+
+export async function upsertSalaryDeduction(
+  data: Omit<SalaryDeduction, 'id' | 'updatedAt' | 'updatedBy'>,
+  updatedBy: string,
+): Promise<void> {
+  await setDoc(doc(db, 'salaryDeductions', `${data.monthYear}_${data.head}`), {
     ...data,
     updatedBy,
     updatedAt: serverTimestamp(),
