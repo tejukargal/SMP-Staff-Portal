@@ -391,7 +391,11 @@ export default function SalaryRecords() {
         const stf = empStaffMap.get(normEmpId(slip.empId));
         if (filterDept   && stf?.dept        !== filterDept)   return false;
         if (filterType   && stf?.type        !== filterType)   return false;
-        if (filterStatus && stf?.status      !== filterStatus) return false;
+        if (filterStatus === 'IN SERVICE') {
+          if (slip.gross === 0) return false;
+        } else if (filterStatus && stf?.status !== filterStatus) {
+          return false;
+        }
         if (filterDesig  && stf?.designation !== filterDesig)  return false;
         if (q && !searchStr.includes(q)) return false;
         return true;

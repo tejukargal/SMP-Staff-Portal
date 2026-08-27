@@ -202,13 +202,201 @@ function AddEntryModal({ existingKeys, onAdd, onClose }: AddEntryModalProps) {
   );
 }
 
+// ── Edit Deduction Modal ────────────────────────────────────────────────────────
+
+interface EditDeductionModalProps {
+  row: DeductionRow;
+  saving: boolean;
+  onSave: (draft: DeductionEditDraft) => void;
+  onClose: () => void;
+}
+
+function EditDeductionModal({ row, saving, onSave, onClose }: EditDeductionModalProps) {
+  const [paymentDate, setPaymentDate] = useState(isoToDmy(row.saved?.paymentDate ?? ''));
+  const [challanNo,   setChallanNo]   = useState(row.saved?.challanNo ?? '');
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/40" style={{ backdropFilter: 'blur(4px)' }} onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4 z-10 border border-gray-100"
+        style={{ animation: 'modal-enter 0.25s ease-out' }}>
+        <h2 className="text-base font-semibold text-gray-900">Edit Deduction</h2>
+        <p className="text-xs text-gray-500 mb-4">{row.head} — {row.month} {row.year}</p>
+        <div className="flex flex-col gap-3 mb-5">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Ded. Payment Date</label>
+            <input type="text" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)}
+              placeholder="dd/mm/yyyy" maxLength={10}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Challan / Ref No.</label>
+            <input type="text" value={challanNo} onChange={(e) => setChallanNo(e.target.value)}
+              placeholder="Challan / reference no…"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300" />
+          </div>
+        </div>
+        <div className="flex justify-end gap-3">
+          <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={() => onSave({ paymentDate, challanNo })} loading={saving} disabled={saving}>
+            <Check className="w-3.5 h-3.5" /> Save
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Grant Edit Modal ─────────────────────────────────────────────────────────
+
+interface GrantFieldProps {
+  label: string;
+  value: string | number;
+  onChange: (v: string) => void;
+  type?: 'number' | 'text';
+  placeholder?: string;
+  accentCls?: string;
+}
+
+function GrantField({ label, value, onChange, type = 'number', placeholder, accentCls = '' }: GrantFieldProps) {
+  return (
+    <div>
+      <label className="block text-[11px] font-medium text-gray-600 mb-1">{label}</label>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        maxLength={type === 'text' && placeholder === 'dd/mm/yyyy' ? 10 : undefined}
+        className={`w-full border rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 tabular-nums ${
+          accentCls || 'border-gray-200 focus:ring-sky-300'
+        }`}
+      />
+    </div>
+  );
+}
+
+interface GrantEditModalProps {
+  row: GrantRow;
+  saving: boolean;
+  onSave: (draft: EditDraft) => void;
+  onClose: () => void;
+}
+
+function GrantEditModal({ row, saving, onSave, onClose }: GrantEditModalProps) {
+  const [draft, setDraft] = useState<EditDraft>(() => draftFromRow(row));
+
+  function patch(updates: Partial<EditDraft>) {
+    setDraft(prev => ({ ...prev, ...updates }));
+  }
+
+  function num(field: keyof EditDraft) {
+    return (draft[field] as number) || 0;
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(4px)' }}
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="relative w-full bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+        style={{ maxWidth: 720, maxHeight: '88vh', animation: 'modal-enter 0.22s cubic-bezier(0.34,1.26,0.64,1)' }}>
+
+        {/* Header */}
+        <div className="flex items-start justify-between px-5 pt-5 pb-3 border-b border-gray-100 shrink-0">
+          <div>
+            <h2 className="text-sm font-semibold text-gray-900 leading-tight">Edit Grant Entry</h2>
+            <p className="text-[11px] text-gray-500 mt-0.5">{row.month} {row.year}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+          <section>
+            <h3 className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mb-2">Salary Components</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <GrantField label="Basic Pay" value={num('basicPay')} onChange={(v) => patch({ basicPay: Number(v) })} />
+              <GrantField label="DA" value={num('daAmount')} onChange={(v) => patch({ daAmount: Number(v) })} />
+              <GrantField label="HRA" value={num('hraAmount')} onChange={(v) => patch({ hraAmount: Number(v) })} />
+              <GrantField label="IR" value={num('ir')} onChange={(v) => patch({ ir: Number(v) })} />
+              <GrantField label="SFN" value={num('sfn')} onChange={(v) => patch({ sfn: Number(v) })} />
+              <GrantField label="P" value={num('p')} onChange={(v) => patch({ p: Number(v) })} />
+              <GrantField label="SPAY" value={num('spayTypist')} onChange={(v) => patch({ spayTypist: Number(v) })} />
+              <GrantField label="Gross" value={num('gross')} onChange={(v) => patch({ gross: Number(v) })}
+                accentCls="border-emerald-300 focus:ring-emerald-400 text-emerald-800 font-semibold" />
+            </div>
+          </section>
+
+          <section>
+            <h3 className="text-[10px] font-bold text-red-700 uppercase tracking-wider mb-2">Deductions</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <GrantField label="IT" value={num('itDeduction')} onChange={(v) => patch({ itDeduction: Number(v) })}
+                accentCls="border-red-200 focus:ring-red-400 text-red-700" />
+              <GrantField label="PT" value={num('ptDeduction')} onChange={(v) => patch({ ptDeduction: Number(v) })}
+                accentCls="border-red-200 focus:ring-red-400 text-red-700" />
+              <GrantField label="GSLIC" value={num('gslic')} onChange={(v) => patch({ gslic: Number(v) })}
+                accentCls="border-red-200 focus:ring-red-400 text-red-700" />
+              <GrantField label="LIC" value={num('lic')} onChange={(v) => patch({ lic: Number(v) })}
+                accentCls="border-red-200 focus:ring-red-400 text-red-700" />
+              <GrantField label="FBF" value={num('fbf')} onChange={(v) => patch({ fbf: Number(v) })}
+                accentCls="border-red-200 focus:ring-red-400 text-red-700" />
+              <GrantField label="Total Deductions" value={num('totalDeductions')} onChange={(v) => patch({ totalDeductions: Number(v) })}
+                accentCls="border-red-300 focus:ring-red-400 text-red-800 font-semibold" />
+              <GrantField label="Net Salary" value={num('netSalary')} onChange={(v) => patch({ netSalary: Number(v) })}
+                accentCls="border-teal-300 focus:ring-teal-400 text-teal-800 font-bold" />
+            </div>
+          </section>
+
+          <section>
+            <h3 className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-2">Grant Administration</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="col-span-2">
+                <GrantField label="Grants Order No." type="text" value={draft.grantsOrderNo}
+                  onChange={(v) => patch({ grantsOrderNo: v })} placeholder="Order no. / reference…"
+                  accentCls="border-amber-300 focus:ring-amber-400" />
+              </div>
+              <GrantField label="Grants (Gross)" value={num('grantsReceivedGross')} onChange={(v) => patch({ grantsReceivedGross: Number(v) })}
+                accentCls="border-amber-300 focus:ring-amber-400 text-amber-800 font-semibold" />
+              <GrantField label="Grants (Ded.)" value={num('grantsReceivedDeductions')} onChange={(v) => patch({ grantsReceivedDeductions: Number(v) })}
+                accentCls="border-amber-300 focus:ring-amber-400 text-red-700 font-semibold" />
+              <GrantField label="Grants (Net)" value={num('grantsReceivedNet')} onChange={(v) => patch({ grantsReceivedNet: Number(v) })}
+                accentCls="border-amber-300 focus:ring-amber-400 text-teal-700 font-bold" />
+              <GrantField label="Salary Credited" type="text" value={draft.salaryCreditedDate}
+                onChange={(v) => patch({ salaryCreditedDate: v })} placeholder="dd/mm/yyyy"
+                accentCls="border-amber-300 focus:ring-amber-400" />
+              <GrantField label="Ded. Received" type="text" value={draft.deductionsReceivedDate}
+                onChange={(v) => patch({ deductionsReceivedDate: v })} placeholder="dd/mm/yyyy"
+                accentCls="border-amber-300 focus:ring-amber-400" />
+            </div>
+          </section>
+        </div>
+
+        {/* Footer */}
+        <div className="shrink-0 px-5 py-3 border-t border-gray-100 flex justify-end gap-3">
+          <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={() => onSave(draft)} loading={saving} disabled={saving}>
+            <Check className="w-3.5 h-3.5" /> Save
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Shared styles ─────────────────────────────────────────────────────────────
 
 const TH = 'px-2.5 py-2 font-semibold text-gray-700 whitespace-nowrap text-[11px]';
 const TD = 'px-2.5 py-2';
 
-const INPUT_BASE =
-  'text-xs border rounded px-1.5 py-1 focus:outline-none focus:ring-1 bg-white w-full tabular-nums';
+function EditButton({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
+  return (
+    <Button variant="secondary" size="sm" onClick={onClick} disabled={disabled} className="px-2 py-1 gap-1">
+      <Pencil className="w-3 h-3" /> Edit
+    </Button>
+  );
+}
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
@@ -223,14 +411,12 @@ export default function SalaryGrants() {
   const [grants,       setGrants]       = useState<SalaryGrant[]>([]);
   const [deductions,   setDeductions]   = useState<SalaryDeduction[]>([]);
   const [loading,      setLoading]      = useState(true);
-  const [editingKey,   setEditingKey]   = useState<string | null>(null);
-  const [editDraft,    setEditDraft]    = useState<EditDraft | null>(null);
+  const [editTarget,   setEditTarget]   = useState<GrantRow | null>(null);
   const [saving,       setSaving]       = useState(false);
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [extraKeys,    setExtraKeys]    = useState<Set<string>>(new Set());
 
-  const [dedEditingKey, setDedEditingKey] = useState<string | null>(null);
-  const [dedEditDraft,  setDedEditDraft]  = useState<DeductionEditDraft | null>(null);
+  const [dedEditTarget, setDedEditTarget] = useState<DeductionRow | null>(null);
   const [dedSaving,     setDedSaving]     = useState(false);
 
   const [filterMode,     setFilterMode]     = useState<'single' | 'range'>('single');
@@ -348,36 +534,29 @@ export default function SalaryGrants() {
     setRangeToYear(''); setRangeToMonth('');
   }
 
-  const patch = useCallback((updates: Partial<EditDraft>) => {
-    setEditDraft(prev => prev ? { ...prev, ...updates } : prev);
-  }, []);
-
   function startEdit(row: GrantRow) {
-    setEditDraft(draftFromRow(row));
-    setEditingKey(row.key);
+    setEditTarget(row);
   }
 
   function cancelEdit(row: GrantRow) {
-    setEditingKey(null);
-    setEditDraft(null);
+    setEditTarget(null);
     if (!row.aggr && !row.grant) {
       setExtraKeys(prev => { const n = new Set(prev); n.delete(row.key); return n; });
     }
   }
 
-  async function saveEdit() {
-    if (!editDraft || !user) return;
+  async function saveEdit(draft: EditDraft) {
+    if (!user) return;
     setSaving(true);
     try {
       await upsertSalaryGrant({
-        ...editDraft,
-        salaryCreditedDate:     dmyToIso(editDraft.salaryCreditedDate),
-        deductionsReceivedDate: dmyToIso(editDraft.deductionsReceivedDate),
+        ...draft,
+        salaryCreditedDate:     dmyToIso(draft.salaryCreditedDate),
+        deductionsReceivedDate: dmyToIso(draft.deductionsReceivedDate),
       }, user.uid);
-      showToast('success', `Saved grant for ${editDraft.month} ${editDraft.year}`);
-      setEditingKey(null);
-      setEditDraft(null);
-      setExtraKeys(prev => { const n = new Set(prev); n.delete(editDraft.monthYear); return n; });
+      showToast('success', `Saved grant for ${draft.month} ${draft.year}`);
+      setEditTarget(null);
+      setExtraKeys(prev => { const n = new Set(prev); n.delete(draft.monthYear); return n; });
       await loadData();
     } catch {
       showToast('error', 'Failed to save grant record');
@@ -387,20 +566,15 @@ export default function SalaryGrants() {
   }
 
   function startDedEdit(row: DeductionRow) {
-    setDedEditDraft({
-      paymentDate: isoToDmy(row.saved?.paymentDate ?? ''),
-      challanNo:   row.saved?.challanNo ?? '',
-    });
-    setDedEditingKey(row.key);
+    setDedEditTarget(row);
   }
 
   function cancelDedEdit() {
-    setDedEditingKey(null);
-    setDedEditDraft(null);
+    setDedEditTarget(null);
   }
 
-  async function saveDedEdit(row: DeductionRow) {
-    if (!dedEditDraft || !user) return;
+  async function saveDedEdit(row: DeductionRow, draft: DeductionEditDraft) {
+    if (!user) return;
     setDedSaving(true);
     try {
       await upsertSalaryDeduction({
@@ -408,12 +582,11 @@ export default function SalaryGrants() {
         month:       row.month,
         year:        row.year,
         head:        row.head,
-        paymentDate: dmyToIso(dedEditDraft.paymentDate),
-        challanNo:   dedEditDraft.challanNo,
+        paymentDate: dmyToIso(draft.paymentDate),
+        challanNo:   draft.challanNo,
       }, user.uid);
       showToast('success', `Saved ${row.head} deduction for ${row.month} ${row.year}`);
-      setDedEditingKey(null);
-      setDedEditDraft(null);
+      setDedEditTarget(null);
       await loadData();
     } catch {
       showToast('error', 'Failed to save deduction record');
@@ -429,8 +602,7 @@ export default function SalaryGrants() {
     if (!existingKeys.has(key)) {
       setExtraKeys(prev => new Set([...prev, key]));
     }
-    setEditDraft(draftFromRow({ key, month, year, aggr, grant }));
-    setEditingKey(key);
+    setEditTarget({ key, month, year, aggr, grant });
   }
 
   // Summary stats
@@ -443,8 +615,6 @@ export default function SalaryGrants() {
   if (loading) {
     return <div className="h-full flex items-center justify-center"><Spinner /></div>;
   }
-
-  const d = editDraft;
 
   return (
     <div className="h-full flex flex-col gap-3" style={{ animation: 'page-enter 0.35s ease-out' }}>
@@ -473,7 +643,7 @@ export default function SalaryGrants() {
         </div>
 
         {activeTab === 'grants' && (
-          <Button size="sm" onClick={() => setAddModalOpen(true)} disabled={!!editingKey}>
+          <Button size="sm" onClick={() => setAddModalOpen(true)} disabled={!!editTarget}>
             <Plus className="w-3.5 h-3.5" /> Add Grant Entry
           </Button>
         )}
@@ -659,37 +829,11 @@ export default function SalaryGrants() {
             {/* ── Body ── */}
             <tbody className="divide-y divide-gray-100">
               {visibleRows.map((row, rowIdx) => {
-                const isEditing = editingKey === row.key;
-                const isSaved   = !!row.grant;
-                const src       = row.grant ?? row.aggr;
+                const isSaved = !!row.grant;
+                const src     = row.grant ?? row.aggr;
 
-                const rowBg = isEditing
-                  ? 'bg-sky-50/50'
-                  : isSaved
-                    ? 'hover:bg-gray-50/50'
-                    : 'bg-amber-50/20 hover:bg-amber-50/40';
-
-                const stickyBg = isEditing
-                  ? 'rgba(240,249,255,0.98)'
-                  : isSaved
-                    ? 'rgba(255,255,255,0.98)'
-                    : 'rgba(255,251,235,0.98)';
-
-                /* ── Number input shared helper ── */
-                function numInput(
-                  field: keyof EditDraft,
-                  borderCls = 'border-sky-200 focus:ring-sky-400',
-                  textCls   = 'text-gray-800',
-                ) {
-                  return (
-                    <input
-                      type="number"
-                      value={d ? ((d[field] as number) || '') : ''}
-                      onChange={(e) => patch({ [field]: Number(e.target.value) } as Partial<EditDraft>)}
-                      className={`${INPUT_BASE} text-right ${borderCls} ${textCls}`}
-                    />
-                  );
-                }
+                const rowBg = isSaved ? 'hover:bg-gray-50/50' : 'bg-amber-50/20 hover:bg-amber-50/40';
+                const stickyBg = isSaved ? 'rgba(255,255,255,0.98)' : 'rgba(255,251,235,0.98)';
 
                 return (
                   <tr key={row.key}
@@ -705,161 +849,76 @@ export default function SalaryGrants() {
 
                     {/* Staff count */}
                     <td className={`${TD} text-center text-gray-600 border-r border-gray-100`}>
-                      {src?.staffCount ?? (isEditing && d ? d.staffCount : 0)}
+                      {src?.staffCount ?? 0}
                     </td>
 
                     {/* ─── Salary fields ─── */}
-                    {isEditing ? (
-                      <>
-                        <td className={TD}>{numInput('basicPay')}</td>
-                        <td className={TD}>{numInput('daAmount')}</td>
-                        <td className={TD}>{numInput('hraAmount')}</td>
-                        <td className={TD}>{numInput('ir')}</td>
-                        <td className={TD}>{numInput('sfn')}</td>
-                        <td className={TD}>{numInput('p')}</td>
-                        <td className={TD}>{numInput('spayTypist')}</td>
-                        <td className={`${TD} border-r border-gray-100`}>
-                          {numInput('gross', 'border-emerald-300 focus:ring-emerald-400', 'text-emerald-800 font-semibold')}
-                        </td>
-                        <td className={TD}>{numInput('itDeduction', 'border-red-200 focus:ring-red-400', 'text-red-700')}</td>
-                        <td className={TD}>{numInput('ptDeduction', 'border-red-200 focus:ring-red-400', 'text-red-700')}</td>
-                        <td className={TD}>{numInput('gslic', 'border-red-200 focus:ring-red-400', 'text-red-700')}</td>
-                        <td className={TD}>{numInput('lic', 'border-red-200 focus:ring-red-400', 'text-red-700')}</td>
-                        <td className={TD}>{numInput('fbf', 'border-red-200 focus:ring-red-400', 'text-red-700')}</td>
-                        <td className={`${TD} border-r border-gray-100`}>
-                          {numInput('totalDeductions', 'border-red-300 focus:ring-red-400', 'text-red-800 font-semibold')}
-                        </td>
-                        <td className={`${TD} border-r border-gray-100`}>
-                          {numInput('netSalary', 'border-teal-300 focus:ring-teal-400', 'text-teal-800 font-bold')}
-                        </td>
+                    <td className={`${TD} text-right tabular-nums text-gray-600`}>{fmt(src?.basicPay ?? 0)}</td>
+                    <td className={`${TD} text-right tabular-nums text-gray-600`}>{fmt(src?.daAmount ?? 0)}</td>
+                    <td className={`${TD} text-right tabular-nums text-gray-600`}>{fmt(src?.hraAmount ?? 0)}</td>
+                    <td className={`${TD} text-right tabular-nums text-gray-500`}>{fmt(src?.ir ?? 0)}</td>
+                    <td className={`${TD} text-right tabular-nums text-gray-500`}>{fmt(src?.sfn ?? 0)}</td>
+                    <td className={`${TD} text-right tabular-nums text-gray-500`}>{fmt(src?.p ?? 0)}</td>
+                    <td className={`${TD} text-right tabular-nums text-gray-500`}>{fmt(src?.spayTypist ?? 0)}</td>
+                    <td className={`${TD} text-right tabular-nums font-semibold text-gray-800 border-r border-gray-100`}>
+                      {fmt(src?.gross ?? 0)}
+                    </td>
+                    <td className={`${TD} text-right tabular-nums text-red-500`}>{fmt(src?.itDeduction ?? 0)}</td>
+                    <td className={`${TD} text-right tabular-nums text-red-500`}>{fmt(src?.ptDeduction ?? 0)}</td>
+                    <td className={`${TD} text-right tabular-nums text-red-500`}>{fmt(src?.gslic ?? 0)}</td>
+                    <td className={`${TD} text-right tabular-nums text-red-500`}>{fmt(src?.lic ?? 0)}</td>
+                    <td className={`${TD} text-right tabular-nums text-red-500`}>{fmt(src?.fbf ?? 0)}</td>
+                    <td className={`${TD} text-right tabular-nums font-semibold text-red-700 border-r border-gray-100`}>
+                      {fmt(src?.totalDeductions ?? 0)}
+                    </td>
+                    <td className={`${TD} text-right tabular-nums font-bold text-teal-700 border-r border-gray-100`}>
+                      {fmt(src?.netSalary ?? 0)}
+                    </td>
 
-                        {/* Grant admin inputs */}
-                        <td className={TD}>
-                          <input type="text"
-                            value={d?.grantsOrderNo ?? ''}
-                            onChange={(e) => patch({ grantsOrderNo: e.target.value })}
-                            placeholder="Order no. / reference…"
-                            className={`${INPUT_BASE} border-amber-300 focus:ring-amber-400 text-left`}
-                            style={{ minWidth: 140 }}
-                          />
-                        </td>
-                        <td className={TD}>
-                          {numInput('grantsReceivedGross', 'border-amber-300 focus:ring-amber-400', 'text-amber-800 font-semibold')}
-                        </td>
-                        <td className={TD}>
-                          {numInput('grantsReceivedDeductions', 'border-amber-300 focus:ring-amber-400', 'text-red-700 font-semibold')}
-                        </td>
-                        <td className={TD}>
-                          {numInput('grantsReceivedNet', 'border-amber-300 focus:ring-amber-400', 'text-teal-700 font-bold')}
-                        </td>
-                        <td className={TD}>
-                          <input type="text"
-                            value={d?.salaryCreditedDate ?? ''}
-                            onChange={(e) => patch({ salaryCreditedDate: e.target.value })}
-                            placeholder="dd/mm/yyyy"
-                            maxLength={10}
-                            className={`${INPUT_BASE} border-amber-300 focus:ring-amber-400`}
-                          />
-                        </td>
-                        <td className={`${TD} border-r border-gray-100`}>
-                          <input type="text"
-                            value={d?.deductionsReceivedDate ?? ''}
-                            onChange={(e) => patch({ deductionsReceivedDate: e.target.value })}
-                            placeholder="dd/mm/yyyy"
-                            maxLength={10}
-                            className={`${INPUT_BASE} border-amber-300 focus:ring-amber-400`}
-                          />
-                        </td>
-                      </>
-                    ) : (
-                      <>
-                        {/* ─── Display mode ─── */}
-                        <td className={`${TD} text-right tabular-nums text-gray-600`}>{fmt(src?.basicPay ?? 0)}</td>
-                        <td className={`${TD} text-right tabular-nums text-gray-600`}>{fmt(src?.daAmount ?? 0)}</td>
-                        <td className={`${TD} text-right tabular-nums text-gray-600`}>{fmt(src?.hraAmount ?? 0)}</td>
-                        <td className={`${TD} text-right tabular-nums text-gray-500`}>{fmt(src?.ir ?? 0)}</td>
-                        <td className={`${TD} text-right tabular-nums text-gray-500`}>{fmt(src?.sfn ?? 0)}</td>
-                        <td className={`${TD} text-right tabular-nums text-gray-500`}>{fmt(src?.p ?? 0)}</td>
-                        <td className={`${TD} text-right tabular-nums text-gray-500`}>{fmt(src?.spayTypist ?? 0)}</td>
-                        <td className={`${TD} text-right tabular-nums font-semibold text-gray-800 border-r border-gray-100`}>
-                          {fmt(src?.gross ?? 0)}
-                        </td>
-                        <td className={`${TD} text-right tabular-nums text-red-500`}>{fmt(src?.itDeduction ?? 0)}</td>
-                        <td className={`${TD} text-right tabular-nums text-red-500`}>{fmt(src?.ptDeduction ?? 0)}</td>
-                        <td className={`${TD} text-right tabular-nums text-red-500`}>{fmt(src?.gslic ?? 0)}</td>
-                        <td className={`${TD} text-right tabular-nums text-red-500`}>{fmt(src?.lic ?? 0)}</td>
-                        <td className={`${TD} text-right tabular-nums text-red-500`}>{fmt(src?.fbf ?? 0)}</td>
-                        <td className={`${TD} text-right tabular-nums font-semibold text-red-700 border-r border-gray-100`}>
-                          {fmt(src?.totalDeductions ?? 0)}
-                        </td>
-                        <td className={`${TD} text-right tabular-nums font-bold text-teal-700 border-r border-gray-100`}>
-                          {fmt(src?.netSalary ?? 0)}
-                        </td>
-
-                        {/* Grant admin — only meaningful when saved */}
-                        <td className={TD}>
-                          {row.grant?.grantsOrderNo
-                            ? <span className="font-medium text-amber-800">{row.grant.grantsOrderNo}</span>
-                            : <span className="text-gray-300">—</span>}
-                        </td>
-                        <td className={`${TD} text-right tabular-nums`}>
-                          <span className={isSaved ? 'font-semibold text-amber-700' : 'text-gray-400'}>
-                            {fmt(row.grant?.grantsReceivedGross ?? src?.gross ?? 0)}
-                          </span>
-                        </td>
-                        <td className={`${TD} text-right tabular-nums`}>
-                          <span className={isSaved ? 'font-semibold text-red-600' : 'text-gray-400'}>
-                            {fmt(row.grant?.grantsReceivedDeductions ?? src?.totalDeductions ?? 0)}
-                          </span>
-                        </td>
-                        <td className={`${TD} text-right tabular-nums`}>
-                          <span className={isSaved ? 'font-bold text-teal-700' : 'text-gray-400'}>
-                            {fmt(row.grant?.grantsReceivedNet ?? src?.netSalary ?? 0)}
-                          </span>
-                        </td>
-                        <td className={`${TD} text-center`}>
-                          {row.grant?.salaryCreditedDate
-                            ? <span className="text-gray-700">{fmtDate(row.grant.salaryCreditedDate)}</span>
-                            : <span className="text-gray-300">—</span>}
-                        </td>
-                        <td className={`${TD} text-center border-r border-gray-100`}>
-                          {row.grant?.deductionsReceivedDate
-                            ? <span className="text-gray-700">{fmtDate(row.grant.deductionsReceivedDate)}</span>
-                            : <span className="text-gray-300">—</span>}
-                        </td>
-                      </>
-                    )}
+                    {/* Grant admin — only meaningful when saved */}
+                    <td className={TD}>
+                      {row.grant?.grantsOrderNo
+                        ? <span className="font-medium text-amber-800">{row.grant.grantsOrderNo}</span>
+                        : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className={`${TD} text-right tabular-nums`}>
+                      <span className={isSaved ? 'font-semibold text-amber-700' : 'text-gray-400'}>
+                        {fmt(row.grant?.grantsReceivedGross ?? src?.gross ?? 0)}
+                      </span>
+                    </td>
+                    <td className={`${TD} text-right tabular-nums`}>
+                      <span className={isSaved ? 'font-semibold text-red-600' : 'text-gray-400'}>
+                        {fmt(row.grant?.grantsReceivedDeductions ?? src?.totalDeductions ?? 0)}
+                      </span>
+                    </td>
+                    <td className={`${TD} text-right tabular-nums`}>
+                      <span className={isSaved ? 'font-bold text-teal-700' : 'text-gray-400'}>
+                        {fmt(row.grant?.grantsReceivedNet ?? src?.netSalary ?? 0)}
+                      </span>
+                    </td>
+                    <td className={`${TD} text-center`}>
+                      {row.grant?.salaryCreditedDate
+                        ? <span className="text-gray-700">{fmtDate(row.grant.salaryCreditedDate)}</span>
+                        : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className={`${TD} text-center border-r border-gray-100`}>
+                      {row.grant?.deductionsReceivedDate
+                        ? <span className="text-gray-700">{fmtDate(row.grant.deductionsReceivedDate)}</span>
+                        : <span className="text-gray-300">—</span>}
+                    </td>
 
                     {/* Actions */}
                     <td className={`${TD} text-center`}>
-                      {isEditing ? (
-                        <div className="flex items-center justify-center gap-1.5">
-                          <Button size="sm" onClick={saveEdit} loading={saving} disabled={saving}>
-                            <Check className="w-3 h-3" /> Save
-                          </Button>
-                          <button onClick={() => cancelEdit(row)}
-                            className="cursor-pointer p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-center gap-1.5">
-                          <span className={`inline-flex items-center text-[10px] font-semibold rounded-full px-2 py-0.5 ${
-                            isSaved
-                              ? 'text-emerald-700 bg-emerald-50 border border-emerald-200'
-                              : 'text-amber-700 bg-amber-50 border border-amber-200'
-                          }`}>
-                            {isSaved ? 'Saved' : 'From Slips'}
-                          </span>
-                          <button
-                            onClick={() => startEdit(row)}
-                            disabled={!!editingKey}
-                            title="Edit"
-                            className="cursor-pointer p-1.5 text-gray-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      )}
+                      <div className="flex items-center justify-center gap-1.5">
+                        <span className={`inline-flex items-center text-[10px] font-semibold rounded-full px-2 py-0.5 ${
+                          isSaved
+                            ? 'text-emerald-700 bg-emerald-50 border border-emerald-200'
+                            : 'text-amber-700 bg-amber-50 border border-amber-200'
+                        }`}>
+                          {isSaved ? 'Saved' : 'From Slips'}
+                        </span>
+                        <EditButton onClick={() => startEdit(row)} />
+                      </div>
                     </td>
                   </tr>
                 );
@@ -936,12 +995,7 @@ export default function SalaryGrants() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {deductionRows.map((row) => {
-                const isEditing = dedEditingKey === row.key;
-                const rowBg = isEditing
-                  ? 'bg-sky-50/50'
-                  : row.saved
-                    ? 'hover:bg-gray-50/50'
-                    : 'bg-amber-50/20 hover:bg-amber-50/40';
+                const rowBg = row.saved ? 'hover:bg-gray-50/50' : 'bg-amber-50/20 hover:bg-amber-50/40';
                 return (
                   <tr key={row.key} className={`transition-colors ${rowBg}`}>
                     <td className={`${TD} text-center text-gray-500`}>{row.sl}</td>
@@ -955,61 +1009,19 @@ export default function SalaryGrants() {
                         ? <span className="text-gray-700">{fmtDate(row.receivedDate)}</span>
                         : <span className="text-gray-300">—</span>}
                     </td>
-                    {isEditing ? (
-                      <>
-                        <td className={TD}>
-                          <input type="text"
-                            value={dedEditDraft?.paymentDate ?? ''}
-                            onChange={(e) => setDedEditDraft(prev => prev ? { ...prev, paymentDate: e.target.value } : prev)}
-                            placeholder="dd/mm/yyyy"
-                            maxLength={10}
-                            className={`${INPUT_BASE} border-amber-300 focus:ring-amber-400 text-center`}
-                          />
-                        </td>
-                        <td className={TD}>
-                          <input type="text"
-                            value={dedEditDraft?.challanNo ?? ''}
-                            onChange={(e) => setDedEditDraft(prev => prev ? { ...prev, challanNo: e.target.value } : prev)}
-                            placeholder="Challan / reference no…"
-                            className={`${INPUT_BASE} border-amber-300 focus:ring-amber-400 text-left`}
-                          />
-                        </td>
-                      </>
-                    ) : (
-                      <>
-                        <td className={`${TD} text-center`}>
-                          {row.saved?.paymentDate
-                            ? <span className="text-gray-700">{fmtDate(row.saved.paymentDate)}</span>
-                            : <span className="text-gray-300">—</span>}
-                        </td>
-                        <td className={TD}>
-                          {row.saved?.challanNo
-                            ? <span className="font-medium text-amber-800">{row.saved.challanNo}</span>
-                            : <span className="text-gray-300">—</span>}
-                        </td>
-                      </>
-                    )}
+                    <td className={`${TD} text-center`}>
+                      {row.saved?.paymentDate
+                        ? <span className="text-gray-700">{fmtDate(row.saved.paymentDate)}</span>
+                        : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className={TD}>
+                      {row.saved?.challanNo
+                        ? <span className="font-medium text-amber-800">{row.saved.challanNo}</span>
+                        : <span className="text-gray-300">—</span>}
+                    </td>
                     {isAdmin && (
                       <td className={`${TD} text-center`}>
-                        {isEditing ? (
-                          <div className="flex items-center justify-center gap-1.5">
-                            <Button size="sm" onClick={() => saveDedEdit(row)} loading={dedSaving} disabled={dedSaving}>
-                              <Check className="w-3 h-3" /> Save
-                            </Button>
-                            <button onClick={cancelDedEdit}
-                              className="cursor-pointer p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => startDedEdit(row)}
-                            disabled={!!dedEditingKey}
-                            title="Edit"
-                            className="cursor-pointer p-1.5 text-gray-400 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                        )}
+                        <EditButton onClick={() => startDedEdit(row)} />
                       </td>
                     )}
                   </tr>
@@ -1026,6 +1038,24 @@ export default function SalaryGrants() {
           existingKeys={existingKeys}
           onAdd={handleAddEntry}
           onClose={() => setAddModalOpen(false)}
+        />
+      )}
+
+      {editTarget && (
+        <GrantEditModal
+          row={editTarget}
+          saving={saving}
+          onSave={(draft) => saveEdit(draft)}
+          onClose={() => cancelEdit(editTarget)}
+        />
+      )}
+
+      {dedEditTarget && (
+        <EditDeductionModal
+          row={dedEditTarget}
+          saving={dedSaving}
+          onSave={(draft) => saveDedEdit(dedEditTarget, draft)}
+          onClose={cancelDedEdit}
         />
       )}
     </div>
