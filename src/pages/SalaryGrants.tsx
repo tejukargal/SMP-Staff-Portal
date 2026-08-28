@@ -467,6 +467,18 @@ export default function SalaryGrants() {
     return m;
   }, [deductions]);
 
+  // In-service staff count per month, mirroring the "IN SERVICE" filter logic in
+  // SalaryRecords.tsx: a staff member counts as in-service for a month only if
+  // their imported salary slip for that month has non-zero gross pay.
+  const inServiceCountMap = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const s of slips) {
+      if ((s.gross || 0) === 0) continue;
+      m.set(s.monthYear, (m.get(s.monthYear) ?? 0) + 1);
+    }
+    return m;
+  }, [slips]);
+
   const deductionRows = useMemo((): DeductionRow[] => {
     let sl = 0;
     const out: DeductionRow[] = [];
@@ -478,7 +490,7 @@ export default function SalaryGrants() {
         const key = `${row.key}_${head.label}`;
         out.push({
           key, sl, head: head.label, month: row.month, year: row.year,
-          noOfStaff: src.staffCount ?? 0,
+          noOfStaff: inServiceCountMap.get(row.key) ?? 0,
           amount: (src as unknown as Record<string, number>)[head.key] ?? 0,
           receivedDate: row.grant?.deductionsReceivedDate ?? '',
           saved: deductionMap.get(key) ?? null,
@@ -486,7 +498,7 @@ export default function SalaryGrants() {
       }
     }
     return out;
-  }, [visibleRows, deductionMap]);
+  }, [visibleRows, deductionMap, inServiceCountMap]);
 
   const hasActiveFilter = filterMode === 'single'
     ? !!(filterYear || filterMonth)
