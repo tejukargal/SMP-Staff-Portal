@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Printer, Download, Search, X, FileText } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Printer, Download, Search, X, FileText, Pencil, Check } from 'lucide-react';
 import { useStaff } from '@/hooks/useStaff';
+import { useRole } from '@/hooks/useRole';
 import { Button } from '@/components/ui/Button';
 import { DeptBadge, StatusBadge } from '@/components/ui/Badge';
 import { PageSpinner } from '@/components/ui/Spinner';
@@ -10,7 +11,7 @@ import { formatDate, computeServiceYears, computeDOR } from '@/utils/dateUtils';
 import { exportStaffToExcel, exportReportToExcel } from '@/utils/exportUtils';
 import { exportReportPdf } from '@/utils/reportsPdf';
 import { buildLatestSlipMap, buildLicRow } from '@/utils/salaryUtils';
-import { getAllSalarySlips } from '@/firebase/firestore';
+import { getAllSalarySlips, updateStaff } from '@/firebase/firestore';
 import type { StaffRecord, SalarySlip } from '@/types';
 import { DEPARTMENTS, STATUSES, DESIGNATIONS, DEPT_COLORS } from '@/constants/enums';
 
@@ -61,7 +62,7 @@ function getBaseData(key: ReportKey, staff: StaffRecord[]): StaffRecord[] {
 function toExportRow(key: ReportKey, s: StaffRecord, slipMap: Map<string, SalarySlip> = new Map()): Record<string, unknown> {
   if (key === 'lic-625') {
     const r = buildLicRow(s, slipMap);
-    return { 'EMP ID': r.empId, NAME: r.name, MONTH: r.month, YEAR: r.year, 'PAY SCALE': r.payScale, 'LIC DEDUCTION': r.lic, '6.25% OF LIC': r.lic625, DIFFERENCE: r.difference, STATUS: r.status };
+    return { 'EMP ID': r.empId, NAME: r.name, MONTH: r.month, YEAR: r.year, 'PAY SCALE': r.payScale, 'LIC DEDUCTION': r.lic, 'EXTRA POLICIES': r.extraPolicies, PLI: r.pli, '6.25% OF LIC': r.lic625, DIFFERENCE: r.difference, STATUS: r.status };
   }
   if (key === 'dor-list')
     return { NAME: s.name, 'EMP ID': s.empId, DESIGNATION: s.designation, DEPT: s.dept, STATUS: s.status, DOB: formatDate(s.dob), DOR: formatDate(computeDOR(s.dob) || s.dor) };
@@ -77,7 +78,11 @@ const SEL = 'rounded-lg border border-sky-100 px-2.5 py-1.5 text-xs bg-white/80 
 // ── Main ───────────────────────────────────────────────────────────────────────
 
 export default function Reports() {
-  const { staff, loading } = useStaff();
+  const { staff, loading, refetch } = useStaff();
+  const { isAdmin } = useRole();
+
+  const [editingLic, setEditingLic] = useState<StaffRecord | null>(null);
+  const [savingLic,  setSavingLic]  = useState(false);
 
   const [active,       setActive]  = useState<ReportKey>('staff-list');
   const [search,       setSearch]  = useState('');
@@ -182,6 +187,18 @@ export default function Reports() {
       desig: fDesig || undefined,
       category: fCategory || undefined,
     }, slipMap), 0);
+  };
+
+  const handleSaveLicExtras = async (extraPolicies: number, pli: number) => {
+    if (!editingLic?.id) return;
+    setSavingLic(true);
+    try {
+      await updateStaff(editingLic.id, { licExtraPolicies: extraPolicies, licPli: pli });
+      refetch();
+      setEditingLic(null);
+    } finally {
+      setSavingLic(false);
+    }
   };
 
   if (loading) return <PageSpinner />;
@@ -371,7 +388,23 @@ export default function Reports() {
           className="flex-1 min-h-0"
         />
       ) : (
-        <ReportTable reportKey={active} data={displayData} slipMap={slipMap} className="flex-1 min-h-0" />
+        <ReportTable
+          reportKey={active}
+          data={displayData}
+          slipMap={slipMap}
+          className="flex-1 min-h-0"
+          isAdmin={isAdmin}
+          onEditLic={setEditingLic}
+        />
+      )}
+
+      {editingLic && (
+        <LicExtrasModal
+          staff={editingLic}
+          saving={savingLic}
+          onSave={handleSaveLicExtras}
+          onClose={() => setEditingLic(null)}
+        />
       )}
 
     </div>
@@ -380,7 +413,10 @@ export default function Reports() {
 
 // ── Report renderers ────────────────────────────────────────────────────────────
 
-function ReportTable({ reportKey, data, slipMap, className }: { reportKey: ReportKey; data: StaffRecord[]; slipMap: Map<string, SalarySlip>; className?: string }) {
+function ReportTable({ reportKey, data, slipMap, className, isAdmin, onEditLic }: {
+  reportKey: ReportKey; data: StaffRecord[]; slipMap: Map<string, SalarySlip>; className?: string;
+  isAdmin?: boolean; onEditLic?: (s: StaffRecord) => void;
+}) {
   if (data.length === 0) {
     return <div className="py-16 text-center text-sm text-gray-300">No records match the current filters</div>;
   }
@@ -392,7 +428,9 @@ function ReportTable({ reportKey, data, slipMap, className }: { reportKey: Repor
           <tr>
             <Th>Sl</Th><Th>Emp ID</Th><Th>Name</Th><Th className="text-center">Month</Th>
             <Th className="text-center">Year</Th><Th>Pay Scale</Th><Th className="text-right">LIC Deduction</Th>
+            <Th className="text-right">Extra Policies</Th><Th className="text-right">PLI</Th>
             <Th className="text-right">6.25% of LIC</Th><Th className="text-right">Difference</Th><Th className="text-center">Status</Th>
+            {isAdmin && <Th className="text-center no-print">Edit</Th>}
           </tr>
         </Thead>
         <tbody>
@@ -408,6 +446,8 @@ function ReportTable({ reportKey, data, slipMap, className }: { reportKey: Repor
                 <Td className="text-xs text-center font-mono">{r.year || '—'}</Td>
                 <Td className="font-mono text-xs">{r.payScale || '—'}</Td>
                 <Td className="text-right tabular-nums">{r.lic === '' ? '—' : r.lic}</Td>
+                <Td className="text-right tabular-nums">{r.extraPolicies}</Td>
+                <Td className="text-right tabular-nums">{r.pli}</Td>
                 <Td className="text-right tabular-nums">{r.lic625 === '' ? '—' : r.lic625}</Td>
                 <Td className={`text-right tabular-nums font-semibold ${diffColor}`}>{r.difference === '' ? '—' : r.difference}</Td>
                 <Td className="text-center">
@@ -417,6 +457,17 @@ function ReportTable({ reportKey, data, slipMap, className }: { reportKey: Repor
                     <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-100 text-green-700">OK</span>
                   ) : '—'}
                 </Td>
+                {isAdmin && (
+                  <Td className="text-center no-print">
+                    <button
+                      onClick={() => onEditLic?.(s)}
+                      className="p-1 rounded-md text-gray-400 hover:bg-sky-50 hover:text-sky-600 transition-colors"
+                      title="Edit Extra Policies / PLI"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                  </Td>
+                )}
               </Tr>
             );
           })}
@@ -543,5 +594,71 @@ function StaffMiniTable({ data, className, scroll }: { data: StaffRecord[]; clas
         ))}
       </tbody>
     </Table>
+  );
+}
+
+// ── LIC Extra Policies / PLI edit modal ─────────────────────────────────────────
+
+function LicExtrasModal({ staff, saving, onSave, onClose }: {
+  staff: StaffRecord;
+  saving: boolean;
+  onSave: (extraPolicies: number, pli: number) => void;
+  onClose: () => void;
+}) {
+  const [extraPolicies, setExtraPolicies] = useState(staff.licExtraPolicies ?? 0);
+  const [pli, setPli] = useState(staff.licPli ?? 0);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(15,23,42,0.45)', backdropFilter: 'blur(4px)' }}
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div
+        className="relative w-full bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+        style={{ maxWidth: 380, animation: 'modal-enter 0.22s cubic-bezier(0.34,1.26,0.64,1)' }}
+      >
+        <div className="flex items-start justify-between px-4 pt-4 pb-2.5 border-b border-gray-100 shrink-0">
+          <div>
+            <h2 className="text-sm font-semibold text-gray-900 leading-tight">Edit LIC Extras</h2>
+            <p className="text-[11px] text-gray-500 mt-0.5">{staff.name} · {staff.empId}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="px-4 py-3 grid grid-cols-1 gap-3">
+          <label className="block">
+            <span className="block text-[11px] font-semibold text-gray-500 mb-1">Extra Policies (₹)</span>
+            <input
+              type="number"
+              value={extraPolicies}
+              onChange={e => setExtraPolicies(Number(e.target.value))}
+              className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-sky-400 focus:border-sky-400"
+            />
+          </label>
+          <label className="block">
+            <span className="block text-[11px] font-semibold text-gray-500 mb-1">PLI (₹)</span>
+            <input
+              type="number"
+              value={pli}
+              onChange={e => setPli(Number(e.target.value))}
+              className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-sky-400 focus:border-sky-400"
+            />
+          </label>
+          <p className="text-[10px] text-gray-400 leading-snug">
+            These are fixed amounts saved to the staff record and used to compute the 6.25% difference. They will not change when a new salary slip is added.
+          </p>
+        </div>
+
+        <div className="shrink-0 px-4 py-3 border-t border-gray-100 flex justify-end gap-3">
+          <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={() => onSave(extraPolicies, pli)} loading={saving} disabled={saving}>
+            <Check className="w-3.5 h-3.5" /> Save
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }

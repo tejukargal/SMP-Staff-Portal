@@ -113,6 +113,8 @@ export interface StaffRecord {
   hra?: number;
   nps?: number;
   pt?: number;
+  licExtraPolicies?: number;
+  licPli?: number;
   createdAt: Timestamp;
   updatedAt: Timestamp;
   createdBy: string;

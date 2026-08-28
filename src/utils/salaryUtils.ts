@@ -61,6 +61,8 @@ export interface LicRow {
   year: number | '';
   payScale: string;
   lic: number | '';
+  extraPolicies: number;
+  pli: number;
   lic625: number | '';
   difference: number | '';
   status: LicStatus;
@@ -68,11 +70,14 @@ export interface LicRow {
 
 export function buildLicRow(s: StaffRecord, slipMap: Map<string, SalarySlip>): LicRow {
   const slip = slipMap.get(normalizeEmpId(s.empId));
+  const extraPolicies = s.licExtraPolicies ?? 0;
+  const pli = s.licPli ?? 0;
   if (!slip) {
-    return { empId: s.empId, name: s.name, month: '', year: '', payScale: '', lic: '', lic625: '', difference: '', status: '' };
+    return { empId: s.empId, name: s.name, month: '', year: '', payScale: '', lic: '', extraPolicies, pli, lic625: '', difference: '', status: '' };
   }
   const lic625 = computeLic625(slip.payScale);
-  const difference = lic625 !== null ? slip.lic - lic625 : '';
+  const totalCovered = slip.lic + extraPolicies + pli;
+  const difference = lic625 !== null ? totalCovered - lic625 : '';
   return {
     empId: s.empId,
     name: s.name,
@@ -80,6 +85,8 @@ export function buildLicRow(s: StaffRecord, slipMap: Map<string, SalarySlip>): L
     year: slip.year,
     payScale: slip.payScale,
     lic: slip.lic,
+    extraPolicies,
+    pli,
     lic625: lic625 ?? '',
     difference,
     status: typeof difference === 'number' ? (difference >= 0 ? 'OK' : 'SHORT') : '',

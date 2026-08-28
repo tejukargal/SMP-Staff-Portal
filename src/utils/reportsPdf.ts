@@ -364,6 +364,8 @@ export function exportLicPdf(
     { header: 'Year',          halign: 'center', get: r => r.year || '—'                       },
     { header: 'Pay Scale',     halign: 'left',   get: r => r.payScale || '—'                   },
     { header: 'LIC Deduction', halign: 'right',  get: r => r.lic === '' ? '—' : r.lic           },
+    { header: 'Extra Policies',halign: 'right',  get: r => r.extraPolicies                      },
+    { header: 'PLI',           halign: 'right',  get: r => r.pli                                },
     { header: '6.25% of LIC',  halign: 'right',  get: r => r.lic625 === '' ? '—' : r.lic625     },
     { header: 'Difference',    halign: 'right',  get: r => r.difference === '' ? '—' : r.difference },
     { header: 'Status',        halign: 'center', get: r => r.status || '—'                     },
