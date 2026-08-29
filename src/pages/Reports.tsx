@@ -427,7 +427,7 @@ function ReportTable({ reportKey, data, slipMap, className, isAdmin, onEditLic }
         <Thead>
           <tr>
             <Th>Sl</Th><Th>Emp ID</Th><Th>Name</Th><Th className="text-center">Month</Th>
-            <Th className="text-center">Year</Th><Th>Pay Scale</Th><Th className="text-right">LIC Deduction</Th>
+            <Th className="text-center">Year</Th><Th className="whitespace-nowrap">Pay Scale</Th><Th className="text-right">LIC Deduction</Th>
             <Th className="text-right">Extra Policies</Th><Th className="text-right">PLI</Th>
             <Th className="text-right">6.25% of LIC</Th><Th className="text-right">Difference</Th><Th className="text-center">Status</Th>
             {isAdmin && <Th className="text-center no-print">Edit</Th>}
@@ -444,7 +444,7 @@ function ReportTable({ reportKey, data, slipMap, className, isAdmin, onEditLic }
                 <Td className="font-medium">{r.name}</Td>
                 <Td className="text-xs text-center">{r.month || '—'}</Td>
                 <Td className="text-xs text-center font-mono">{r.year || '—'}</Td>
-                <Td className="font-mono text-xs">{r.payScale || '—'}</Td>
+                <Td className="font-mono text-xs whitespace-nowrap">{r.payScale || '—'}</Td>
                 <Td className="text-right tabular-nums">{r.lic === '' ? '—' : r.lic}</Td>
                 <Td className="text-right tabular-nums">{r.extraPolicies}</Td>
                 <Td className="text-right tabular-nums">{r.pli}</Td>
@@ -459,13 +459,15 @@ function ReportTable({ reportKey, data, slipMap, className, isAdmin, onEditLic }
                 </Td>
                 {isAdmin && (
                   <Td className="text-center no-print">
-                    <button
+                    <Button
+                      variant="secondary"
+                      size="sm"
                       onClick={() => onEditLic?.(s)}
-                      className="p-1 rounded-md text-gray-400 hover:bg-sky-50 hover:text-sky-600 transition-colors"
+                      className="px-2 py-1 gap-1"
                       title="Edit Extra Policies / PLI"
                     >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
+                      <Pencil className="w-3 h-3" /> Edit
+                    </Button>
                   </Td>
                 )}
               </Tr>
